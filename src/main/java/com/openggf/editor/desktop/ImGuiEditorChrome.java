@@ -1,7 +1,12 @@
 package com.openggf.editor.desktop;
 
+import com.openggf.control.InputHandler;
+import com.openggf.editor.EditorCommandPalette;
 import com.openggf.editor.EditorWindowChrome;
 import org.lwjgl.glfw.GLFW;
+
+import java.util.ArrayDeque;
+import java.util.List;
 
 /**
  * OpenGGF's {@link EditorWindowChrome} implemented with Dear ImGui: menu bar, toolbar, docked
@@ -20,6 +25,8 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
     private boolean viewportOverridden;
     private EditorChromeShell.Area canvas;
     private final int[] game = new int[5];
+    /** Actions and commands chosen while drawing; they run at the next editor tick. */
+    private final ArrayDeque<Runnable> pending = new ArrayDeque<>();
 
     @Override
     public void init(Host engine, float framebufferScale) {
@@ -68,9 +75,22 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
     public void render(int windowWidth, int windowHeight, int framebufferWidth, int framebufferHeight) {
         if (!active) return;
         host.beginFrame(windowWidth, windowHeight, framebufferWidth, framebufferHeight);
-        canvas = shell.draw(new EditorChromeShell.Frame(engine.controller(), engine::dispatch, engine.commands(),
+        // Playtest, save and project commands switch modes and load levels; that belongs in the
+        // editor tick, not after the frame's final display pass, so drawing only queues them.
+        List<EditorCommandPalette.HostCommand> commands = engine.commands().stream()
+                .map(command -> new EditorCommandPalette.HostCommand(command.label(),
+                        () -> pending.addLast(command.action())))
+                .toList();
+        canvas = shell.draw(new EditorChromeShell.Frame(engine.controller(),
+                action -> pending.addLast(() -> engine.dispatch(action)), commands,
                 game[0], game[1], game[2], game[3], game[4]));
         host.endFrameAndRender();
+    }
+
+    @Override
+    public boolean update(InputHandler input) {
+        while (!pending.isEmpty()) pending.removeFirst().run();
+        return false;
     }
 
     @Override
@@ -115,6 +135,7 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
 
     @Override
     public void close() {
+        pending.clear();
         if (shell != null) shell.close();
         host.close();
     }

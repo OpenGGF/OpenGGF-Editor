@@ -40,13 +40,19 @@ public final class EditorChromeHost implements AutoCloseable {
     public void init(float framebufferScale) {
         if (initialized) return;
         ImGui.createContext();
-        ImGuiIO io = ImGui.getIO();
-        // Layout lives in code for now; persisted docking state is a later decision.
-        io.setIniFilename(null);
-        io.addConfigFlags(ImGuiConfigFlags.DockingEnable);
-        loadFonts(io, Math.max(1f, framebufferScale));
-        EditorChromeTheme.apply(ImGui.getStyle());
-        renderer.init("#version 410 core");
+        try {
+            ImGuiIO io = ImGui.getIO();
+            // Layout lives in code for now; persisted docking state is a later decision.
+            io.setIniFilename(null);
+            io.addConfigFlags(ImGuiConfigFlags.DockingEnable);
+            loadFonts(io, Math.max(1f, framebufferScale));
+            EditorChromeTheme.apply(ImGui.getStyle());
+            renderer.init("#version 410 core");
+        } catch (RuntimeException | Error failure) {
+            // close() only tears down a finished init; release the context here.
+            ImGui.destroyContext();
+            throw failure;
+        }
         initialized = true;
         lastFrameNanos = System.nanoTime();
     }

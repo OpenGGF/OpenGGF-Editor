@@ -7,7 +7,7 @@
 #
 # Usage: scripts/install-engine.sh <path to an OpenGGF checkout>
 # The checkout needs the editor window-chrome extension point (EditorWindowChrome),
-# currently on OpenGGF branch feature/ai-editor-window-chrome-seam.
+# on OpenGGF develop.
 
 set -euo pipefail
 
@@ -16,7 +16,7 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 engine="$(cd -- "$engine" && pwd)"
 
 if [[ ! -f "$engine/src/main/java/com/openggf/editor/EditorWindowChrome.java" ]]; then
-    echo "$engine has no EditorWindowChrome; check out feature/ai-editor-window-chrome-seam" >&2
+    echo "$engine has no EditorWindowChrome; check out OpenGGF develop" >&2
     exit 1
 fi
 

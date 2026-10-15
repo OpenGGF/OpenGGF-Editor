@@ -222,7 +222,8 @@ public final class EditorChromeShell implements AutoCloseable {
         Integer chunk = controller.selection().selectedChunk();
         ImGui.alignTextToFramePadding();
         crumb(EditorIcons.MAP + " World", depth == EditorHierarchyDepth.WORLD, () -> {
-            while (controller.depth() != EditorHierarchyDepth.WORLD) frame.dispatch().accept(Action.ASCEND);
+            // Dispatched actions run at the next editor tick, so queue one step per level.
+            for (int level = controller.depth().ordinal(); level > 0; level--) frame.dispatch().accept(Action.ASCEND);
         });
         if (depth != EditorHierarchyDepth.WORLD) {
             separatorChevron();
@@ -351,7 +352,7 @@ public final class EditorChromeShell implements AutoCloseable {
         if (ImGui.begin(LIBRARY)) {
             if (level == null) {
                 ImGui.textDisabled("No level loaded");
-            } else if (controller.spawnEditMode() == EditorSpawnEditMode.OBJECTS && controller.objectPalette() != null) {
+            } else if (controller.spawnEditMode() == EditorSpawnEditMode.OBJECTS && controller.objectPaletteOrNull() != null) {
                 drawObjectLibrary(controller);
             } else if (controller.spawnEditMode() == EditorSpawnEditMode.RINGS) {
                 ImGui.textWrapped("Rings need no library. Click the level to place a ring; Delete removes the ring under the cursor.");
@@ -889,7 +890,9 @@ public final class EditorChromeShell implements AutoCloseable {
             Runnable first = null;
             int shown = 0;
             ImGui.beginChild("##commandList", 0, 300, false);
-            var commands = new java.util.ArrayList<>(palette.actionCommands(frame.dispatch()));
+            // The in-game focus panes and library browser are not drawn here, so their commands are left out.
+            var commands = new java.util.ArrayList<>(palette.actionCommands(frame.dispatch(),
+                    action -> !EditorCommandPalette.drivesInGamePanes(action)));
             commands.addAll(palette.extraCommands());
             for (var command : commands) {
                 if (!query.isEmpty() && !command.label().toLowerCase(Locale.ROOT).contains(query)) continue;

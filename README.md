@@ -35,8 +35,8 @@ in OpenGGF.
 ## Requirements
 
 - JDK 25 and Maven.
-- An OpenGGF checkout that has the `EditorWindowChrome` extension point. Until that is
-  merged, use the branch `feature/ai-editor-window-chrome-seam`.
+- An OpenGGF checkout of `develop` (0.7.prerelease), which has the `EditorWindowChrome`
+  extension point. Without this editor, OpenGGF uses its own controller-first editor HUD.
 - Your own ROM dump. OpenGGF loads all art and data from it. It supports:
 
   | Game | CRC32 | SHA-1 |
@@ -52,7 +52,7 @@ in OpenGGF.
 
 ```bash
 git clone https://github.com/OpenGGF/OpenGGF.git
-git -C OpenGGF checkout feature/ai-editor-window-chrome-seam
+git -C OpenGGF checkout develop
 git clone https://github.com/OpenGGF/OpenGGF-Editor.git
 cd OpenGGF-Editor
 scripts/install-engine.sh ../OpenGGF   # builds the engine into ./.m2
