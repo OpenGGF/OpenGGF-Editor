@@ -38,6 +38,7 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
     @Override
     public boolean setActive(boolean editorFrame) {
         active = editorFrame && host.isInitialized();
+        if (!active && shell != null) shell.closeCommandPalette();
         return active;
     }
 
@@ -90,7 +91,7 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
     @Override
     public boolean update(InputHandler input) {
         while (!pending.isEmpty()) pending.removeFirst().run();
-        return false;
+        return shell != null && shell.isCommandPaletteOpen();
     }
 
     @Override
@@ -104,21 +105,26 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
         if (!active) return true;
         host.onMouseButton(button, action);
         // Releases always reach the engine so a stroke that started in the canvas can finish.
-        return action == GLFW.GLFW_RELEASE || !host.wantsMouse();
+        return action == GLFW.GLFW_RELEASE || (!shell.isCommandPaletteOpen() && !host.wantsMouse());
     }
 
     @Override
     public boolean scroll(double xOffset, double yOffset) {
         if (!active) return true;
         host.onScroll(xOffset, yOffset);
-        return !host.wantsMouse();
+        return !shell.isCommandPaletteOpen() && !host.wantsMouse();
     }
 
     @Override
     public boolean key(int key, int action, int mods) {
         if (!active) return true;
         host.onKey(key, action, mods);
-        return action == GLFW.GLFW_RELEASE || !host.wantsKeyboard();
+        if (key == GLFW.GLFW_KEY_F1 && action == GLFW.GLFW_PRESS) {
+            if (shell.isCommandPaletteOpen()) shell.closeCommandPalette();
+            else shell.openCommandPalette();
+            return false;
+        }
+        return action == GLFW.GLFW_RELEASE || (!shell.isCommandPaletteOpen() && !host.wantsKeyboard());
     }
 
     @Override

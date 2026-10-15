@@ -67,8 +67,9 @@ engine checkout.
 
 The first start creates `config.yaml` in the working directory. Set your ROM path there,
 or start from a directory where OpenGGF is already configured. At the title screen, open
-**Tools → Editor projects** to create, open or import a level. To compare against the
-engine's in-game editor chrome, add `-Dopenggf.editor.ui=classic`.
+**Tools → Editor projects** to create, open or import a level. This desktop provider
+replaces the engine's built-in controller HUD. To use that HUD, run OpenGGF without
+the desktop editor on its class path.
 
 ## Known limits
 

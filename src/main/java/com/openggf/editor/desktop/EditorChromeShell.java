@@ -63,6 +63,7 @@ public final class EditorChromeShell implements AutoCloseable {
     private final float[] thumbnailSize = {64f};
     private boolean layoutBuilt;
     private boolean commandPaletteFocus;
+    private boolean commandPaletteOpen;
     private int patternPaletteLine;
     private Area canvas = new Area(0, 0, 1, 1);
 
@@ -108,7 +109,7 @@ public final class EditorChromeShell implements AutoCloseable {
                 if (ImGui.menuItem(EditorIcons.DOWNLOAD + "  Export level", "Ctrl+Shift+E")) frame.dispatch().accept(Action.EXPORT);
                 ImGui.separator();
                 for (var command : frame.commands()) {
-                    if (isPlaytest(command.label()) || command.label().startsWith("Toggle library")) continue;
+                    if (isPlaytest(command.label())) continue;
                     if (ImGui.menuItem(command.label())) command.action().run();
                 }
                 ImGui.endMenu();
@@ -121,7 +122,7 @@ public final class EditorChromeShell implements AutoCloseable {
                 if (ImGui.menuItem(EditorIcons.PIPETTE + "  Pick at cursor", "E")) frame.dispatch().accept(Action.PERFORM_EYEDROP);
                 if (ImGui.menuItem(EditorIcons.ERASER + "  Erase selection", "Del")) frame.dispatch().accept(Action.ERASE_SELECTION);
                 ImGui.separator();
-                if (ImGui.menuItem(EditorIcons.SEARCH + "  Command palette", "F1")) EditorCommandPalette.forController(controller).open();
+                if (ImGui.menuItem(EditorIcons.SEARCH + "  Command palette", "F1")) openCommandPalette();
                 ImGui.endMenu();
             }
             if (ImGui.beginMenu("View")) {
@@ -864,12 +865,21 @@ public final class EditorChromeShell implements AutoCloseable {
 
     // ---------------------------------------------------------------- command palette
 
+    void openCommandPalette() {
+        commandPaletteOpen = true;
+        commandPaletteFocus = true;
+    }
+
+    void closeCommandPalette() {
+        commandPaletteOpen = false;
+        commandFilter.set("");
+    }
+
+    boolean isCommandPaletteOpen() { return commandPaletteOpen; }
+
     private void drawCommandPalette(Frame frame) {
         EditorCommandPalette palette = EditorCommandPalette.forController(frame.controller());
-        if (!palette.isOpen()) {
-            commandPaletteFocus = true;
-            return;
-        }
+        if (!commandPaletteOpen) return;
         ImGuiViewport viewport = ImGui.getMainViewport();
         float width = Math.min(560, viewport.getSizeX() - 80);
         ImGui.setNextWindowPos(viewport.getPosX() + (viewport.getSizeX() - width) / 2, viewport.getPosY() + 90);
@@ -890,30 +900,28 @@ public final class EditorChromeShell implements AutoCloseable {
             Runnable first = null;
             int shown = 0;
             ImGui.beginChild("##commandList", 0, 300, false);
-            // The in-game focus panes and library browser are not drawn here, so their commands are left out.
-            var commands = new java.util.ArrayList<>(palette.actionCommands(frame.dispatch(),
-                    action -> !EditorCommandPalette.drivesInGamePanes(action)));
-            commands.addAll(palette.extraCommands());
+            // The engine catalogue contains editing actions shared by both editor hosts.
+            var commands = new java.util.ArrayList<>(palette.actionCommands(frame.dispatch()));
+            commands.addAll(frame.commands());
             for (var command : commands) {
                 if (!query.isEmpty() && !command.label().toLowerCase(Locale.ROOT).contains(query)) continue;
                 if (first == null) first = command.action();
                 if (ImGui.selectable(command.label(), shown == 0)) {
-                    palette.close();
+                    closeCommandPalette();
                     command.action().run();
                 }
                 shown++;
             }
             ImGui.endChild();
             if (submitted && first != null) {
-                palette.close();
+                closeCommandPalette();
                 first.run();
             }
-            if (ImGui.isKeyPressed(ImGuiKey.Escape)) palette.close();
+            if (ImGui.isKeyPressed(ImGuiKey.Escape)) closeCommandPalette();
         }
         ImGui.end();
         ImGui.popStyleVar(2);
         ImGui.popStyleColor();
-        if (!palette.isOpen()) commandFilter.set("");
     }
 
     private static String hex(Integer value) {
