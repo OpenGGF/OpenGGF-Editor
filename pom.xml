@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.openggf</groupId>
+    <artifactId>openggf-editor</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <name>OpenGGF Editor</name>
+    <description>Desktop level editor for OpenGGF, built with Dear ImGui (prototype).</description>
+    <url>https://github.com/OpenGGF/OpenGGF-Editor</url>
+
+    <licenses>
+        <license>
+            <name>GNU General Public License v3.0</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.html</url>
+        </license>
+    </licenses>
+
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- The engine release line this editor builds against. OpenGGF is not published to a
+             remote repository yet: scripts/install-engine.sh installs a checkout into this
+             project's private local repository (.mvn/maven.config), never into ~/.m2. -->
+        <openggf.version>0.7.prerelease</openggf.version>
+        <imgui.version>1.92.7.1</imgui.version>
+        <native.access.argLine>--enable-native-access=ALL-UNNAMED</native.access.argLine>
+        <!-- Extra JVM options for the launcher; macOS needs the GLFW main thread. -->
+        <launcher.platform.arg>-Dopenggf.editor.platform=default</launcher.platform.arg>
+    </properties>
+
+    <profiles>
+        <profile>
+            <id>imgui-natives-linux</id>
+            <activation><os><family>unix</family><name>Linux</name></os></activation>
+            <properties><imgui.natives.artifact>imgui-java-natives-linux</imgui.natives.artifact></properties>
+        </profile>
+        <profile>
+            <id>imgui-natives-macos</id>
+            <activation><os><family>mac</family></os></activation>
+            <properties>
+                <imgui.natives.artifact>imgui-java-natives-macos</imgui.natives.artifact>
+                <launcher.platform.arg>-XstartOnFirstThread</launcher.platform.arg>
+            </properties>
+        </profile>
+        <profile>
+            <id>imgui-natives-windows</id>
+            <activation><os><family>windows</family></os></activation>
+            <properties><imgui.natives.artifact>imgui-java-natives-windows</imgui.natives.artifact></properties>
+        </profile>
+    </profiles>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.openggf</groupId>
+            <artifactId>OpenGGF</artifactId>
+            <version>${openggf.version}</version>
+        </dependency>
+        <!-- The LWJGL backend's own LWJGL dependencies are excluded so the engine's pinned
+             LWJGL stays authoritative; every call ImGuiImplGl3 makes exists in LWJGL 3.3.3. -->
+        <dependency>
+            <groupId>io.github.spair</groupId>
+            <artifactId>imgui-java-binding</artifactId>
+            <version>${imgui.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.spair</groupId>
+            <artifactId>imgui-java-lwjgl3</artifactId>
+            <version>${imgui.version}</version>
+            <exclusions>
+                <exclusion><groupId>org.lwjgl</groupId><artifactId>*</artifactId></exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.spair</groupId>
+            <artifactId>${imgui.natives.artifact}</artifactId>
+            <version>${imgui.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <release>${maven.compiler.release}</release>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <argLine>${native.access.argLine}</argLine>
+                </configuration>
+            </plugin>
+            <plugin>
+                <!-- mvn compile exec:exec starts the editor with the engine's usual JVM options. -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <executable>${java.home}/bin/java</executable>
+                    <arguments>
+                        <argument>${launcher.platform.arg}</argument>
+                        <argument>${native.access.argLine}</argument>
+                        <argument>--add-exports</argument>
+                        <argument>java.base/java.lang=ALL-UNNAMED</argument>
+                        <argument>--add-exports</argument>
+                        <argument>java.desktop/sun.awt=ALL-UNNAMED</argument>
+                        <argument>--add-exports</argument>
+                        <argument>java.desktop/sun.java2d=ALL-UNNAMED</argument>
+                        <argument>-XX:+UseG1GC</argument>
+                        <argument>-XX:MaxGCPauseMillis=5</argument>
+                        <argument>-classpath</argument>
+                        <classpath/>
+                        <argument>com.openggf.editor.desktop.OpenGGFEditor</argument>
+                    </arguments>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
