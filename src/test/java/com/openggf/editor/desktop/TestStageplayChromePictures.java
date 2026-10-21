@@ -14,6 +14,7 @@ import com.openggf.stageplay.StageplayTimeline;
 import com.openggf.editor.stageplay.StageplayWorkspace;
 import com.openggf.stageplay.runtime.StageplayRenderer;
 import com.openggf.stageplay.runtime.StageplayResources;
+import com.openggf.stageplay.editor.StageplayEditorSession;
 import com.openggf.tools.HeadlessGameBoot;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.system.MemoryUtil;
@@ -52,10 +53,15 @@ class TestStageplayChromePictures {
                  var chrome = new ImGuiEditorChrome()) {
                 int[] start = GameServices.module().getZoneRegistry().getStartPosition(0, 0);
                 double x = Math.max(0, start[0] - 80), y = Math.max(0, start[1] - 140);
-                var scene = StageplayDocument.empty("s2", 0, 0, x, y, 320, 224).withName("The next adventure")
+                var scene = StageplayDocument.empty("s2", 0, 0, x, y, 384, 216).withName("The next adventure")
                         .withActors(List.of(
-                                new StageplayDocument.Actor("hero", "Sonic", "s2", "sonic", List.of(key(0, x + 80, start[1], -1), key(120, x + 160, start[1], 1))),
-                                new StageplayDocument.Actor("friend", "Tails", "s2", "tails", List.of(key(0, x + 220, start[1], -1)))))
+                                new StageplayDocument.Actor("hero", "Sonic", "s2", "sonic", List.of(key(0, x + 80, start[1], -1), key(120, x + 160, start[1], 1),key(240,x+80,start[1],-1))),
+                                new StageplayDocument.Actor("friend", "Tails", "s2", "tails", List.of(key(0, x + 220, start[1], -1),key(240,x+220,start[1],-1)))))
+                        .withCamera(List.of(new StageplayDocument.CameraKey(0,x,y,1,StageplayDocument.Interpolation.LINEAR),
+                                new StageplayDocument.CameraKey(240,x,y,1,StageplayDocument.Interpolation.HOLD)))
+                        .withCameraEffects(List.of(new StageplayDocument.CameraEffect("quake",30,90,2,4,8,7)))
+                        .withSceneChanges(List.of(new StageplayDocument.SceneChange("next-shot",240,
+                                new StageplayDocument.SetSource("s2",0,1,"",""),StageplayDocument.Transition.FADE_BLACK,30)))
                         .withCaptions(List.of(new StageplayDocument.Caption("greeting", 0, 180, "Ready for another adventure?", 12, 190, -1)))
                         .withAudio(List.of(new StageplayDocument.AudioCue("music", 0, StageplayDocument.AudioKind.ROM_MUSIC, "s2", 129, "", 1)));
                 var workspace = new StageplayWorkspace(() -> scene);
@@ -75,14 +81,21 @@ class TestStageplayChromePictures {
                     assertTrue(java.util.Arrays.stream(sprite.image().pixels()).anyMatch(pixel -> (pixel >>> 24) != 0),
                             "The pictured cast must resolve visible ROM artwork: " + actor.actorId() + " at frame " + frame);
                 }
-                surface.record(320, 224, canvas -> renderer.draw(scene, StageplayTimeline.sample(scene, 60), canvas));
+                surface.record(scene.width(),scene.height(), canvas -> renderer.draw(scene, StageplayTimeline.sample(scene, 60), canvas));
                 assertTrue(chrome.setActive(true));
-                for (int i = 0; i < 4; i++) render(chrome, surface);
-                capture("workspace");
+                for (int i = 0; i < 4; i++) render(chrome, surface,scene,1600,900);
+                capture("workspace",1600,900);
                 chrome.key(GLFW_KEY_F1, GLFW_PRESS, 0);
-                render(chrome, surface);
-                render(chrome, surface);
-                capture("commands");
+                render(chrome, surface,scene,1600,900);
+                render(chrome, surface,scene,1600,900);
+                capture("commands",1600,900);
+                chrome.key(GLFW_KEY_ESCAPE,GLFW_PRESS,0); chrome.update(new InputHandler());
+                workspace.invoke(StageplayWorkspace.Action.CAMERA_MODE); workspace.moveCamera(8,0,1.1);
+                surface.record(scene.width(),scene.height(),canvas -> renderer.draw(workspace.previewDocument(),workspace.previewFrame(),canvas));
+                for (int i=0;i<4;i++) render(chrome,surface,scene,1280,720);
+                capture("camera-720p",1280,720);
+                for (int i=0;i<4;i++) render(chrome,surface,scene,1024,576);
+                capture("camera-small",1024,576);
                 assertEquals(GL_NO_ERROR, glGetError());
             }
         }
@@ -93,27 +106,28 @@ class TestStageplayChromePictures {
         return new StageplayDocument.ActorKey(frame, x, y, 5, pose, false, true, 1, StageplayDocument.Interpolation.LINEAR);
     }
 
-    private static void render(ImGuiEditorChrome chrome, SceneSurface surface) {
+    private static void render(ImGuiEditorChrome chrome, SceneSurface surface,StageplayDocument scene,int width,int height) {
         assertTrue(chrome.update(new InputHandler()));
-        int[] viewport = chrome.gameViewport(1600, 900, 1600, 900, 320, 224);
-        glViewport(0, 0, 1600, 900);
+        int[] viewport = chrome.gameViewport(width,height,width,height,320,224);
+        glViewport(0, 0, width,height);
         glDisable(GL_SCISSOR_TEST);
         glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
-        glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-        surface.render(SceneSurface.projection(320, 224), viewport);
-        chrome.render(1600, 900, 1600, 900);
+        int[] fitted = StageplayEditorSession.fitViewport(viewport,scene.width(),scene.height());
+        glViewport(fitted[0], fitted[1], fitted[2], fitted[3]);
+        surface.render(SceneSurface.projection(scene.width(),scene.height()), fitted);
+        chrome.render(width,height,width,height);
     }
 
-    private static void capture(String name) throws Exception {
+    private static void capture(String name,int width,int height) throws Exception {
         glFinish();
-        ByteBuffer pixels = MemoryUtil.memAlloc(1600 * 900 * 4);
+        ByteBuffer pixels = MemoryUtil.memAlloc(width * height * 4);
         try {
             glPixelStorei(GL_PACK_ALIGNMENT, 1);
-            glReadPixels(0, 0, 1600, 900, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-            var image = new BufferedImage(1600, 900, BufferedImage.TYPE_INT_RGB);
-            for (int y = 0; y < 900; y++) for (int x = 0; x < 1600; x++) {
-                int at = ((899 - y) * 1600 + x) * 4;
+            glReadPixels(0, 0, width,height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+            var image = new BufferedImage(width,height, BufferedImage.TYPE_INT_RGB);
+            for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+                int at = ((height-1-y) * width + x) * 4;
                 image.setRGB(x, y, (pixels.get(at) & 255) << 16 | (pixels.get(at + 1) & 255) << 8 | pixels.get(at + 2) & 255);
             }
             Path output = Path.of("target", "stageplay-desktop", name + ".png");

@@ -34,13 +34,14 @@ final class StageplayChromeShell {
     private static final int FIXED_WINDOW = ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove
             | ImGuiWindowFlags.NoDocking | ImGuiWindowFlags.NoSavedSettings
             | ImGuiWindowFlags.NoBringToFrontOnFocus | ImGuiWindowFlags.NoNavFocus;
-    private static final float TOOLBAR_HEIGHT = 48;
+    private static final float TOOLBAR_HEIGHT = 70;
     private static final float STATUS_HEIGHT = 28;
     private static final int ROW_PAGE_SIZE = 64;
 
     private final EditorChromeHost host;
     private final ImString filter = new ImString(128);
     private boolean layoutBuilt;
+    private boolean compactLayout;
     private boolean commandPalette;
     private boolean focusPalette;
     private int cuePage;
@@ -49,6 +50,8 @@ final class StageplayChromeShell {
     private EditorChromeShell.Area canvas = new EditorChromeShell.Area(0, 0, 1, 1);
 
     StageplayChromeShell(EditorChromeHost host) { this.host = host; }
+
+    static boolean compactLayout(float width, float height) { return width < 1100 || height < 480; }
 
     /** Prefer crisp integer upscaling, but fit scenes larger than the authoring canvas. */
     static int[] fitPreview(int x, int y, int width, int height, int logicalWidth, int logicalHeight) {
@@ -108,12 +111,14 @@ final class StageplayChromeShell {
                     if (ImGui.menuItem("Redo", "Ctrl+Y", false, frame.workspace.controller().canRedo())) frame.invoke(Action.REDO);
                     ImGui.separator();
                     menuItem(frame, Action.SCENE, "");
+                    menuItem(frame, Action.FILM_FORMAT, "");
                 } finally { ImGui.endMenu(); }
             }
             if (ImGui.beginMenu("Direct")) {
                 try {
                     for (Action action : List.of(Action.ADD_ACTOR, Action.EDIT_ACTOR, Action.DELETE_ACTOR,
-                            Action.SET_KEY, Action.DELETE_KEY, Action.CAMERA_KEY, Action.CAPTION, Action.AUDIO, Action.RECORD))
+                            Action.SET_KEY, Action.DELETE_KEY, Action.CAMERA_MODE, Action.SET_CAMERA_KEY, Action.CAMERA_KEY,
+                            Action.RECORD_CAMERA, Action.CAMERA_EFFECTS, Action.SCENE_CHANGES, Action.CAPTION, Action.AUDIO, Action.RECORD))
                         menuItem(frame, action, "");
                 } finally { ImGui.endMenu(); }
             }
@@ -149,11 +154,18 @@ final class StageplayChromeShell {
             ImGui.sameLine();
             if (ImGui.button("Stop")) frame.invoke(Action.STOP);
             ImGui.sameLine();
-            if (ImGui.button(frame.workspace.recording() ? "Finish take" : "Record directed take"))
-                frame.invoke(frame.workspace.recording() ? Action.STOP : Action.RECORD);
-            if (ImGui.isItemHovered()) ImGui.setTooltip("Record a baked visual performance with WASD. This is directed motion, not physics input replay.");
-            ImGui.sameLine(0, 20);
-            ImGui.textDisabled(frame.workspace.controller().document().name());
+            if (ImGui.button(frame.workspace.recording() ? "Finish take" : frame.workspace.cameraMode() ? "Record camera R" : "Record actor R")) {
+                if (frame.workspace.recording()) frame.queue.accept(frame.workspace::stop);
+                else frame.invoke(frame.workspace.cameraMode() ? Action.RECORD_CAMERA : Action.RECORD);
+            }
+            if (ImGui.isItemHovered()) ImGui.setTooltip("One recorded take is one undo step. WASD directs actors; camera mode also uses arrows and Q/E zoom.");
+            ImGui.sameLine();
+            ImGui.beginDisabled(frame.workspace.recording());
+            if (ImGui.button(frame.workspace.cameraMode() ? "Camera mode ON  C" : "Direct camera  C")) frame.invoke(Action.CAMERA_MODE);
+            ImGui.endDisabled();
+            ImGui.textDisabled(frame.workspace.cameraMode()
+                    ? "CAMERA: WASD / arrows pan | Q / E zoom | K capture key | R record | C exit"
+                    : frame.workspace.controller().document().name() + "   |   C camera direction   |   F1 all commands");
         }
         ImGui.end();
     }
@@ -166,19 +178,24 @@ final class StageplayChromeShell {
         ImGui.popStyleVar();
         try {
             int dockId = ImGui.getID("StageplayDock");
-            if (!layoutBuilt) {
+            boolean compact = compactLayout(width,height);
+            if (!layoutBuilt || compact != compactLayout) {
                 imgui.internal.ImGui.dockBuilderRemoveNode(dockId);
                 imgui.internal.ImGui.dockBuilderAddNode(dockId, imgui.internal.flag.ImGuiDockNodeFlags.DockSpace);
                 imgui.internal.ImGui.dockBuilderSetNodeSize(dockId, Math.max(1, width), Math.max(1, height));
                 var left = new ImInt(); var right = new ImInt(); var rest = new ImInt(); var center = new ImInt(); var bottom = new ImInt();
                 imgui.internal.ImGui.dockBuilderSplitNode(dockId, ImGuiDir.Down, .28f, bottom, rest);
                 imgui.internal.ImGui.dockBuilderSplitNode(rest.get(), ImGuiDir.Left, Math.min(.25f, 245f / Math.max(1, width)), left, center);
-                imgui.internal.ImGui.dockBuilderSplitNode(center.get(), ImGuiDir.Right, Math.min(.35f, 310f / Math.max(1, width - 245)), right, rest);
                 imgui.internal.ImGui.dockBuilderDockWindow(CAST, left.get());
-                imgui.internal.ImGui.dockBuilderDockWindow(INSPECTOR, right.get());
+                if (compact) imgui.internal.ImGui.dockBuilderDockWindow(INSPECTOR, left.get());
+                else {
+                    imgui.internal.ImGui.dockBuilderSplitNode(center.get(), ImGuiDir.Right, Math.min(.35f, 310f / Math.max(1, width - 245)), right, rest);
+                    imgui.internal.ImGui.dockBuilderDockWindow(INSPECTOR, right.get());
+                }
                 imgui.internal.ImGui.dockBuilderDockWindow(TIMELINE, bottom.get());
                 imgui.internal.ImGui.dockBuilderFinish(dockId);
                 layoutBuilt = true;
+                compactLayout = compact;
             }
             ImGui.dockSpace(dockId, 0, 0, ImGuiDockNodeFlags.PassthruCentralNode);
             var central = imgui.internal.ImGui.dockBuilderGetCentralNode(dockId);
@@ -206,6 +223,9 @@ final class StageplayChromeShell {
             ImGui.separator();
             if (ImGui.button("Scene and set", -1, 0)) frame.invoke(Action.SCENE);
             if (ImGui.button("Camera key", -1, 0)) frame.invoke(Action.CAMERA_KEY);
+            if (ImGui.button("Camera shake / quake", -1, 0)) frame.invoke(Action.CAMERA_EFFECTS);
+            if (ImGui.button("Scene changes / transitions", -1, 0)) frame.invoke(Action.SCENE_CHANGES);
+            if (ImGui.button("Film format presets", -1, 0)) frame.invoke(Action.FILM_FORMAT);
             if (ImGui.button("Caption", -1, 0)) frame.invoke(Action.CAPTION);
             if (ImGui.button("Sound, music or voice", -1, 0)) frame.invoke(Action.AUDIO);
         }
@@ -217,7 +237,18 @@ final class StageplayChromeShell {
             var controller = frame.workspace.controller();
             var actor = controller.document().actors().stream()
                     .filter(value -> value.id().equals(controller.selectedActorId())).findFirst().orElse(null);
-            if (actor == null) {
+            if (frame.workspace.cameraMode()) {
+                var camera = frame.workspace.directorCamera();
+                ImGui.textColored(EditorChromeTheme.SELECTION, "CAMERA DIRECTION");
+                ImGui.text("Position: " + coordinate(camera.x()) + ", " + coordinate(camera.y()));
+                ImGui.text("Zoom: " + coordinate(camera.zoom()));
+                ImGui.textWrapped("WASD / arrows pan. Q / E zoom around the film centre. Shift moves faster. K captures this framing.");
+                if (ImGui.button("Capture camera key  K", -1, 0)) frame.invoke(Action.SET_CAMERA_KEY);
+                if (ImGui.button("Edit / remove camera key", -1, 0)) frame.invoke(Action.CAMERA_KEY);
+                if (ImGui.button("Record camera take  R", -1, 0)) frame.invoke(Action.RECORD_CAMERA);
+                if (ImGui.button("Shake / quake effects", -1, 0)) frame.invoke(Action.CAMERA_EFFECTS);
+                ImGui.textWrapped("Framing is a preview until captured. Seeking discards unkeyed framing. Shake is layered over the base camera.");
+            } else if (actor == null) {
                 ImGui.textWrapped("Select an actor to direct its movement, animation and poses.");
             } else {
                 ImGui.textColored(EditorChromeTheme.SELECTION, actor.name());
@@ -239,7 +270,8 @@ final class StageplayChromeShell {
             }
             ImGui.separator();
             ImGui.textWrapped("Select a key or cue in the timeline to seek. Direction forms are shared with the in-engine editor.");
-            if (frame.workspace.recording()) ImGui.textColored(EditorChromeTheme.WARNING, "Recording: WASD move / Space stop");
+            if (frame.workspace.recording()) ImGui.textColored(EditorChromeTheme.WARNING,
+                    frame.workspace.recordingCamera() ? "Camera take: pan / zoom / Space stop" : "Actor take: WASD move / Space stop");
         }
         ImGui.end();
     }
@@ -294,6 +326,10 @@ final class StageplayChromeShell {
         for (var key : document.camera()) rows.add(new CueRow(key.frame(), "Camera", key.interpolation().name(), ""));
         for (var caption : document.captions()) rows.add(new CueRow(caption.startFrame(), "Caption", caption.text().replace('\n', ' '), ""));
         for (var cue : document.audio()) rows.add(new CueRow(cue.frame(), "Audio", cue.kind().name(), ""));
+        for (var effect : document.cameraEffects()) rows.add(new CueRow(effect.startFrame(), "Camera shake",
+                effect.amplitudeX() + " / " + effect.amplitudeY() + " px, " + effect.frequency() + " Hz to " + effect.endFrame(), ""));
+        for (var change : document.sceneChanges()) rows.add(new CueRow(change.frame(), "Scene change",
+                change.transition() + " / " + change.set().gameId() + " zone " + change.set().zone() + " act " + change.set().act(), ""));
         rows.sort(Comparator.comparingInt(CueRow::frame));
         rowDocument = document;
         cachedRows = List.copyOf(rows);
@@ -334,8 +370,9 @@ final class StageplayChromeShell {
     private void commands(Frame frame) {
         if (!commandPalette) return;
         var viewport = ImGui.getMainViewport();
-        ImGui.setNextWindowPos(viewport.getPosX() + viewport.getSizeX() / 2 - 250, viewport.getPosY() + 90);
-        ImGui.setNextWindowSize(500, Math.min(500, viewport.getSizeY() - 120));
+        float width = Math.min(500, Math.max(160,viewport.getSizeX()-32));
+        ImGui.setNextWindowPos(viewport.getPosX() + (viewport.getSizeX()-width)/2, viewport.getPosY() + 60);
+        ImGui.setNextWindowSize(width, Math.max(120,Math.min(500, viewport.getSizeY() - 90)));
         if (ImGui.begin("Stageplay commands", ImGuiWindowFlags.NoDocking | ImGuiWindowFlags.NoCollapse)) {
             if (focusPalette) { ImGui.setKeyboardFocusHere(); focusPalette = false; }
             boolean submitted = ImGui.inputTextWithHint("##stageplayCommand", "Find a command", filter,

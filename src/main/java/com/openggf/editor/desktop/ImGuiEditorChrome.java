@@ -106,6 +106,7 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
     public boolean update(InputHandler input) {
         boolean wasStageplay = stageplayActive();
         while (!pending.isEmpty()) pending.removeFirst().run();
+        if (stageplayActive()) engine.stageplay().setCameraInputEnabled(!paletteOpen() && !host.wantsTextInput());
         // Consume the transition tick too: a click or held key cannot paint terrain on exit.
         return wasStageplay || stageplayActive() || paletteOpen();
     }
@@ -162,18 +163,24 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
 
     private boolean stageplayKey(StageplayWorkspace workspace, int key, int action, int mods) {
         if (action == GLFW.GLFW_RELEASE) return true;
+        // Shared camera input must see modifiers even if a movement key was held first.
+        if (key == GLFW.GLFW_KEY_LEFT_CONTROL || key == GLFW.GLFW_KEY_RIGHT_CONTROL
+                || key == GLFW.GLFW_KEY_LEFT_SUPER || key == GLFW.GLFW_KEY_RIGHT_SUPER) return true;
         if (workspace.recording()) {
             if (action == GLFW.GLFW_PRESS && (key == GLFW.GLFW_KEY_SPACE || key == GLFW.GLFW_KEY_ESCAPE)) {
-                pending.addLast(() -> workspace.invoke(Action.STOP));
+                pending.addLast(workspace::stop);
                 return false;
             }
+            if (workspace.recordingCamera()) return StageplayWorkspace.cameraMotionKey(key);
             return key == GLFW.GLFW_KEY_W || key == GLFW.GLFW_KEY_A || key == GLFW.GLFW_KEY_S || key == GLFW.GLFW_KEY_D;
         }
+        boolean control = (mods & (GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_SUPER)) != 0;
+        if (workspace.cameraMode() && !control && !paletteOpen() && !host.wantsTextInput()
+                && StageplayWorkspace.cameraMotionKey(key)) return true;
         if (action != GLFW.GLFW_PRESS) return false;
         if (key == GLFW.GLFW_KEY_F1) { stageplayShell.toggleCommandPalette(); return false; }
         if (key == GLFW.GLFW_KEY_ESCAPE && paletteOpen()) { stageplayShell.closeCommandPalette(); return false; }
         if (paletteOpen() || host.wantsKeyboard()) return false;
-        boolean control = (mods & (GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_SUPER)) != 0;
         boolean shift = (mods & GLFW.GLFW_MOD_SHIFT) != 0;
         Action command = null;
         if (control) {
@@ -182,7 +189,10 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
             else if (key == GLFW.GLFW_KEY_Y) command = Action.REDO;
         } else {
             if (key == GLFW.GLFW_KEY_SPACE) command = Action.PLAY;
-            else if (key == GLFW.GLFW_KEY_K) command = Action.SET_KEY;
+            else if (key == GLFW.GLFW_KEY_C) command = Action.CAMERA_MODE;
+            else if (key == GLFW.GLFW_KEY_R) command = workspace.cameraMode() ? Action.RECORD_CAMERA : Action.RECORD;
+            else if (key == GLFW.GLFW_KEY_K) command = workspace.cameraMode() ? Action.SET_CAMERA_KEY : Action.SET_KEY;
+            else if (key == GLFW.GLFW_KEY_ESCAPE && workspace.cameraMode()) command = Action.CAMERA_MODE;
             else if (key == GLFW.GLFW_KEY_DELETE) command = Action.DELETE_KEY;
             else if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_RIGHT) {
                 int direction = key == GLFW.GLFW_KEY_LEFT ? -1 : 1;

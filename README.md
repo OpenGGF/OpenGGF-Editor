@@ -40,16 +40,39 @@ in OpenGGF.
 
 With a level open, press **F4** or choose **File → Stageplay workspace**. Add an actor,
 move the playhead, and choose **Set / edit key at playhead** to author movement or a
-pose. The **Direct** menu also exposes camera keys, captions and audio cues. Property
+pose. The **Direct** menu also exposes camera keys, shake/quake effects, scene changes,
+captions and audio cues. Property
 forms use the engine's keyboard, mouse and controller controls; choose a field, edit
 it, then use the form's final action to apply the change.
 
 **Space** plays or pauses; **Left / Right** steps a frame (**Shift** steps 60 frames).
 **K** opens the selected actor's key at the playhead. **Ctrl+Z / Ctrl+Y** undo and redo;
 **Ctrl+S** saves and **Ctrl+Shift+S** chooses a new path. **F1** lists every Stageplay
-command. The **Record directed take** button records WASD movement as a baked visual
+command. The **Record actor** button records WASD movement as a baked visual
 performance; **Space** or **Stop** finishes the take. Recorded direction does not run
 native character physics.
+
+Press **C** for camera direction. **WASD / arrows** pan, **Q / E** zoom around the film
+centre, and **Shift** pans faster. **K** captures the framing as a camera key; **R**
+records a camera take with the same controls, committed as one undo step. **Space**
+finishes recording. Framing remains a preview until captured; seeking discards unkeyed
+framing. Numeric camera properties and key removal remain available in **Direct →
+Camera keys**. Shake/quake effects have their own interval, amplitudes, frequency and
+seed, so they layer over pan and zoom without changing camera keys.
+
+**Scene changes / transitions** adds, edits or deletes a switch to another ROM set or
+relative `.ogfproject`. Choose a cut, black/white fade or left/right wipe. Transitions
+are centred on the switch frame and cannot overlap. Inserting or moving a change adds
+incoming actor and camera keys together; position those keys for the new shot. Removing
+a change keeps its keys. Both editors save these tracks in version-two `.stageplay`
+documents and can open existing version-one scenes.
+
+Windowed authoring requests a temporary 16:9 window of at least **1280 × 720**, reduced
+to fit smaller screens. Leaving Stageplay restores the previous window size and removes
+those constraints; gameplay display settings are unchanged. Fullscreen and maximized
+windows keep their placement. On smaller windows, Cast and Direction share a tabbed
+side panel. **Edit → Film format presets** controls film dimensions independently;
+the preview preserves film aspect with letterboxing, and sprites are never stretched.
 
 Stageplay `.stageplay` files are shared with OpenGGF's built-in editor: save in either
 interface and reopen in the other without conversion. Scene files reference your ROMs

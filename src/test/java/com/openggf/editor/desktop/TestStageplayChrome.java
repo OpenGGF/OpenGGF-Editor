@@ -134,6 +134,42 @@ class TestStageplayChrome {
         assertArrayEquals(new int[] {10, 40, 640, 360, 0}, fit);
     }
 
+    @Test
+    void cameraModePassesMotionKeysCapturesThroughQueueAndSuspendsForPalette() throws Exception {
+        var workspace = workspace(); workspace.activate(); var chrome = chrome(workspace);
+        chrome.key(GLFW_KEY_C,GLFW_PRESS,0); assertFalse(workspace.cameraMode());
+        var input = new InputHandler(); chrome.update(input); assertTrue(workspace.cameraMode());
+        assertTrue(chrome.key(GLFW_KEY_RIGHT,GLFW_PRESS,0));
+        assertTrue(chrome.key(GLFW_KEY_Q,GLFW_PRESS,0));
+        assertTrue(chrome.key(GLFW_KEY_LEFT_CONTROL,GLFW_PRESS,GLFW_MOD_CONTROL));
+        assertTrue(chrome.key(GLFW_KEY_LEFT_CONTROL,GLFW_RELEASE,0));
+        input.handleKeyEvent(GLFW_KEY_RIGHT,GLFW_PRESS); input.refreshLogicalSnapshot();
+        chrome.update(input); workspace.tick(input);
+        assertEquals(0,workspace.controller().frame()); assertEquals(2,workspace.directorCamera().x());
+        chrome.key(GLFW_KEY_F1,GLFW_PRESS,0); chrome.update(input); workspace.tick(input);
+        assertEquals(2,workspace.directorCamera().x(),"a held arrow cannot pan behind the palette");
+        chrome.key(GLFW_KEY_ESCAPE,GLFW_PRESS,0); chrome.update(input);
+        input.handleKeyEvent(GLFW_KEY_RIGHT,GLFW_RELEASE);
+        chrome.key(GLFW_KEY_K,GLFW_PRESS,0); assertEquals(0,workspace.controller().document().camera().getFirst().x());
+        chrome.update(input); assertEquals(2,workspace.controller().document().camera().getFirst().x());
+        chrome.key(GLFW_KEY_R,GLFW_PRESS,0); chrome.update(input); assertTrue(workspace.recordingCamera());
+        assertTrue(chrome.key(GLFW_KEY_E,GLFW_PRESS,0)); assertTrue(chrome.key(GLFW_KEY_DOWN,GLFW_PRESS,0));
+        chrome.key(GLFW_KEY_SPACE,GLFW_PRESS,0); chrome.update(input); assertFalse(workspace.recording());
+    }
+
+    @Test
+    void smallWindowsShareSidePanelTabsAndNewTracksRemainReachable() {
+        assertFalse(StageplayChromeShell.compactLayout(1280,570));
+        assertTrue(StageplayChromeShell.compactLayout(1024,450));
+        assertTrue(StageplayChromeShell.compactLayout(1280,400));
+        var doc = StageplayDocument.empty("s2",0,0,0,0,320,224);
+        doc = doc.withCamera(List.of(doc.camera().getFirst(),new StageplayDocument.CameraKey(100,20,30,1,StageplayDocument.Interpolation.HOLD)))
+                .withCameraEffects(List.of(new StageplayDocument.CameraEffect("quake",20,60,2,4,8,1)))
+                .withSceneChanges(List.of(new StageplayDocument.SceneChange("shot",100,doc.set(),StageplayDocument.Transition.WIPE_RIGHT,30)));
+        var rows = new StageplayChromeShell(new EditorChromeHost()).cueRows(doc);
+        assertEquals(List.of("Camera","Camera shake","Camera","Scene change"),rows.stream().map(StageplayChromeShell.CueRow::track).toList());
+    }
+
     private static StageplayWorkspace workspace() {
         return new StageplayWorkspace(() -> StageplayDocument.empty("s2", 0, 0, 0, 0, 320, 224));
     }
