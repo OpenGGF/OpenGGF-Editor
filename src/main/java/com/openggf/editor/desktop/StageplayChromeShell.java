@@ -1,8 +1,8 @@
 package com.openggf.editor.desktop;
 
 import com.openggf.stageplay.StageplayDocument;
-import com.openggf.stageplay.editor.StageplayWorkspace;
-import com.openggf.stageplay.editor.StageplayWorkspace.Action;
+import com.openggf.editor.stageplay.StageplayWorkspace;
+import com.openggf.editor.stageplay.StageplayWorkspace.Action;
 import imgui.ImGui;
 import imgui.flag.ImGuiCol;
 import imgui.flag.ImGuiDir;

@@ -3,8 +3,8 @@ package com.openggf.editor.desktop;
 import com.openggf.control.InputHandler;
 import com.openggf.editor.EditorCommandPalette;
 import com.openggf.editor.EditorWindowChrome;
-import com.openggf.stageplay.editor.StageplayWorkspace;
-import com.openggf.stageplay.editor.StageplayWorkspace.Action;
+import com.openggf.editor.stageplay.StageplayWorkspace;
+import com.openggf.editor.stageplay.StageplayWorkspace.Action;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayDeque;

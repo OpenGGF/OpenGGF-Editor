@@ -7,7 +7,7 @@ import com.openggf.editor.EditorWindowChrome;
 import com.openggf.editor.LevelEditorController;
 import com.openggf.stageplay.StageplayDocument;
 import com.openggf.stageplay.StageplayStore;
-import com.openggf.stageplay.editor.StageplayWorkspace;
+import com.openggf.editor.stageplay.StageplayWorkspace;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
