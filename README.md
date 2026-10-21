@@ -50,6 +50,25 @@ dialogue, captions and audio cues. Property
 forms use the engine's keyboard, mouse and controller controls; choose a field, edit
 it, then use the form's final action to apply the change.
 
+Choose **LIVE** in **Scene and set** (or an individual scene change) for native level
+objects, rings, hazards and independently directed characters in one world. The
+**Direct native actions** menu adds waits, rolling, crouching and looking up. S3K Tails
+can fly toward a destination and hover; S3K Knuckles can glide. Release ends an ability
+through its native controls. Movement can follow a placed object by its layout index,
+expected object ID/subtype and local offset. Waits observe actual arrival, support,
+landing, hurt, recovery or ring collection, with a finite timeout. The inspector shows
+shared rings, hurt, ability state, supporting placement and target status; the timeline
+retains those instructions and camera follow targets.
+
+LIVE uses the set's own game for every Puppet, a native height of 224 pixels and fixed
+1x zoom. Width can be 320–1920. Configure the original ROM file for each referenced
+game. Preview runs the native world separately from the open level, including repeatable
+seeking and native effects. Actors must remain within the native object activation
+window around the camera; author routes and jumps explicitly. This is not a pathfinder.
+Camera keys can follow one actor or a group, with dead zones, look-ahead, smoothing and
+offsets. Set **follow** to comma-separated actor IDs in the camera-key form. Pan,
+shake and transitions remain available; Q/E zoom is for terrain-only shots.
+
 **Space** plays or pauses; **Left / Right** steps a frame (**Shift** steps 60 frames).
 **K** opens the selected actor's Puppet actions or Poser key at the playhead. **Ctrl+Z / Ctrl+Y** undo and redo;
 **Ctrl+S** saves and **Ctrl+Shift+S** chooses a new path. **F1** lists every Stageplay
@@ -59,7 +78,7 @@ the take; one take is one undo step. Repeated preview reads and seeking use dete
 physics replay, without advancing the live level.
 
 In **Actor properties**, disable **Start on floor** for an airborne physical start,
-or select **POSER** for flying, poses or coordinate choreography. **Poser** mode retains
+or select **POSER** for deliberate poses or coordinate choreography. **Poser** mode retains
 the position, animation and frame key editor and WASD position recording. Changing performance
 mode shows an undoable conversion: Puppet retains shot placements and visibility;
 Poser removes Puppet commands. Puppet placement resets only at shot boundaries;
@@ -82,8 +101,8 @@ relative `.ogfproject`. Choose a cut, black/white fade or left/right wipe. Trans
 are centred on the switch frame and cannot overlap. Inserting or moving a change adds
 incoming actor and camera keys together; position those keys for the new shot. Removing
 a change keeps its keys; physical actors normalize former placement keys to visibility
-keys. Both editors save version-four `.stageplay` documents and can open versions one
-through three.
+keys. Both editors save version-five `.stageplay` documents and can open versions one
+through four, preserving their existing world mode.
 
 **Direct → Dialogue lines** creates named speech panels. Choose a cast member or an
 explicit offscreen speaker, then edit the text, interval and panel position. Actor
@@ -114,8 +133,8 @@ projects under the scene folder. Save As preserves relative asset paths and refu
 to move the scene away from assets still referenced by its undo or redo history. **File → Export film** uses the engine's shared exporter.
 **F4** returns to level editing and keeps the scene and its undo history available.
 
-The initial scene workflow is linear and uses load-state scenery; dynamic level events,
-water and live stock objects are not reproduced by the staged set preview. Editor panel
+The **TERRAIN_ONLY** world mode uses load-state scenery without live stock objects or
+zone events. **LIVE** advances the production world as described above. Editor panel
 positions and command-filter text are not saved into the scene.
 
 ## Requirements

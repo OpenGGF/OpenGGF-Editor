@@ -2,6 +2,7 @@ package com.openggf.editor.desktop;
 
 import com.openggf.stageplay.StageplayDocument;
 import com.openggf.stageplay.StageplayDialogue;
+import com.openggf.stageplay.StageplayTimeline;
 import com.openggf.editor.stageplay.StageplayWorkspace;
 import com.openggf.editor.stageplay.StageplayWorkspace.Action;
 import imgui.ImGui;
@@ -159,13 +160,14 @@ final class StageplayChromeShell {
                 if (frame.workspace.recording()) frame.queue.accept(frame.workspace::stop);
                 else frame.invoke(frame.workspace.cameraMode() ? Action.RECORD_CAMERA : Action.RECORD);
             }
-            if (ImGui.isItemHovered()) ImGui.setTooltip("One take is one undo. Puppet: A/D move, W jump, release/S brake. Poser: WASD choreography. Camera: WASD/arrows, Q/E zoom.");
+            if (ImGui.isItemHovered()) ImGui.setTooltip("One take is one undo. Puppet: A/D move, W jump, release/S brake. Poser: WASD choreography. Camera: WASD/arrows pan."
+                    + (live(frame.workspace) ? " Live world keeps zoom at 1x." : " Q/E zoom."));
             ImGui.sameLine();
             ImGui.beginDisabled(frame.workspace.recording());
             if (ImGui.button(frame.workspace.cameraMode() ? "Camera mode ON  C" : "Direct camera  C")) frame.invoke(Action.CAMERA_MODE);
             ImGui.endDisabled();
             ImGui.textDisabled(frame.workspace.cameraMode()
-                    ? "CAMERA: WASD / arrows pan | Q / E integer zoom | K capture key | R record | C exit"
+                    ? "CAMERA: WASD / arrows pan | " + (live(frame.workspace) ? "Live world: 1x" : "Q / E integer zoom") + " | K capture key | R record | C exit"
                     : frame.workspace.controller().document().name() + "   |   C camera direction   |   F1 all commands");
         }
         ImGui.end();
@@ -209,6 +211,7 @@ final class StageplayChromeShell {
     private void cast(Frame frame) {
         if (ImGui.begin(CAST)) {
             ImGui.textDisabled("ACTORS");
+            ImGui.textDisabled(live(frame.workspace) ? "Live world / native objects and rings" : "Terrain only / staged scenery");
             ImGui.separator();
             if (ImGui.button("Add actor", -1, 0)) frame.invoke(Action.ADD_ACTOR);
             var actors = frame.workspace.controller().document().actors();
@@ -246,7 +249,9 @@ final class StageplayChromeShell {
                 ImGui.text("Position: " + coordinate(camera.x()) + ", " + coordinate(camera.y()));
                 ImGui.text("Zoom: " + coordinate(camera.zoom()));
                 if (camera.zoom()!=Math.rint(camera.zoom())) ImGui.textWrapped("Imported fractional zoom: use Q/E or capture integer framing to avoid shimmer.");
-                ImGui.textWrapped("WASD / arrows pan. Q / E step integer zoom around the film centre. Hold to repeat. Shift moves faster. K captures framing; zoom cuts at keys.");
+                ImGui.textWrapped(live(frame.workspace)
+                        ? "WASD / arrows pan. Shift moves faster. K captures framing. Live world uses 1x zoom; edit a camera key to follow one actor or frame a group."
+                        : "WASD / arrows pan. Q / E step integer zoom around the film centre. Hold to repeat. Shift moves faster. K captures framing; zoom cuts at keys.");
                 if (ImGui.button("Capture camera key  K", -1, 0)) frame.invoke(Action.SET_CAMERA_KEY);
                 if (ImGui.button("Edit / remove camera key", -1, 0)) frame.invoke(Action.CAMERA_KEY);
                 if (ImGui.button("Record camera take  R", -1, 0)) frame.invoke(Action.RECORD_CAMERA);
@@ -260,9 +265,14 @@ final class StageplayChromeShell {
                 ImGui.separator();
                 boolean physical = frame.workspace.selectedActorIsPuppet();
                 ImGui.textWrapped(frame.workspace.selectedActorStatus());
+                var world = frame.workspace.previewFrame().world();
+                if (world != null) world.actors().stream().filter(a -> a.actorId().equals(actor.id())).findFirst()
+                        .ifPresent(state -> ImGui.textWrapped(liveActorStatus(state)));
                 if (physical) {
                     ImGui.textColored(EditorChromeTheme.SELECTION, "PUPPET / NATIVE PHYSICS");
-                    ImGui.textWrapped("Move sets a destination and urgency. Jump uses native physics. Goals are attempts; terrain can block arrival.");
+                    ImGui.textWrapped(live(frame.workspace)
+                            ? "Direct movement, jumps and native abilities. Target a placed object, or wait for contact, arrival or recovery. Goals can be blocked or time out."
+                            : "Move sets a destination and urgency. Jump uses native physics. Goals are attempts; terrain can block arrival.");
                     ImGui.textWrapped("Placement applies at shot boundaries. Actor properties can disable floor snapping or choose Poser choreography.");
                 } else {
                     ImGui.textColored(EditorChromeTheme.SELECTION, "POSER / POSITION AND POSE");
@@ -275,7 +285,7 @@ final class StageplayChromeShell {
                     ImGui.text("Transition: " + key.interpolation());
                 }
                 ImGui.spacing();
-                if (ImGui.button(physical ? "Move / jump / stop  K" : "Set / edit key at playhead", -1, 0)) frame.invoke(Action.SET_KEY);
+                if (ImGui.button(physical ? (live(frame.workspace) ? "Direct native actions  K" : "Move / jump / stop  K") : "Set / edit key at playhead", -1, 0)) frame.invoke(Action.SET_KEY);
                 if (ImGui.button(physical ? "Delete action at playhead" : "Delete key at playhead", -1, 0)) frame.invoke(Action.DELETE_KEY);
                 if (ImGui.button("Actor properties", -1, 0)) frame.invoke(Action.EDIT_ACTOR);
                 if (ImGui.button("Remove actor", -1, 0)) frame.invoke(Action.DELETE_ACTOR);
@@ -291,6 +301,37 @@ final class StageplayChromeShell {
     }
 
     private static String coordinate(double value) { return String.format(Locale.ROOT, "%.2f", value); }
+
+    private static boolean live(StageplayWorkspace workspace) {
+        return StageplayTimeline.sample(workspace.controller().document(), workspace.controller().frame())
+                .set().worldPolicy() == StageplayDocument.WorldPolicy.LIVE;
+    }
+
+    static String liveActorStatus(StageplayTimeline.LiveActor actor) {
+        return "Shared rings: " + actor.rings() + (actor.ringDelta() == 0 ? "" : " (" + (actor.ringDelta() > 0 ? "+" : "") + actor.ringDelta() + ")")
+                + " | " + (actor.dead() ? "Dead" : actor.hurt() ? "Hurt" : "Ready")
+                + "\nAbility: " + actor.ability() + " / " + actor.abilityState() + " / " + actor.abilityTimer() + " ticks"
+                + (actor.onObject() ? "\nRiding layout #" + actor.ridingLayoutIndex() : "")
+                + "\nTarget: " + actor.targetStatus();
+    }
+
+    private static String commandDetail(StageplayDocument.PuppetCommand command) {
+        String destination = command.target().layoutIndex() >= 0
+                ? "Layout #" + command.target().layoutIndex() + " + " + coordinate(command.target().offsetX()) + ", " + coordinate(command.target().offsetY())
+                : "Goal " + coordinate(command.x()) + ", " + coordinate(command.y());
+        String detail = switch (command.kind()) {
+            case MOVE_TO, FLY_TO, GLIDE_TO -> destination + " / " + Math.round(command.urgency() * 100) + "%";
+            case HOVER -> "Hold native hover for " + command.holdFrames() + " frames";
+            case JUMP -> "Hold " + command.holdFrames() + " frames";
+            case STOP -> "Native braking";
+            case WAIT -> "Wait for " + command.condition() + (command.target().layoutIndex() >= 0 ? " / " + destination : "");
+            case RELEASE -> "Release native controls";
+            case CROUCH -> "Crouch for " + command.holdFrames() + " frames";
+            case LOOK_UP -> "Look up for " + command.holdFrames() + " frames";
+            case ROLL -> "Native roll";
+        };
+        return detail + (command.timeoutFrames() > 0 ? " / timeout " + command.timeoutFrames() + " frames" : "");
+    }
 
     private void timeline(Frame frame) {
         if (ImGui.begin(TIMELINE)) {
@@ -342,12 +383,10 @@ final class StageplayChromeShell {
         }
         for (var track : document.puppets()) for (var command : track.commands()) {
             var actor = document.actors().stream().filter(a -> a.id().equals(track.actorId())).findFirst().orElseThrow();
-            String detail = command.kind() == StageplayDocument.PuppetCommandKind.MOVE_TO
-                    ? "Goal " + coordinate(command.x()) + ", " + coordinate(command.y()) + " / " + Math.round(command.urgency()*100) + "%"
-                    : command.kind() == StageplayDocument.PuppetCommandKind.JUMP ? "Hold " + command.holdFrames() + " frames" : "Native braking";
-            rows.add(new CueRow(command.frame(), actor.name() + " / " + command.kind(), detail, actor.id()));
+            rows.add(new CueRow(command.frame(), actor.name() + " / " + command.kind(), commandDetail(command), actor.id()));
         }
-        for (var key : document.camera()) rows.add(new CueRow(key.frame(), "Camera", key.interpolation().name(), ""));
+        for (var key : document.camera()) rows.add(new CueRow(key.frame(), "Camera", key.follow().actors().isEmpty()
+                ? key.interpolation().name() : "Follow " + String.join(", ", key.follow().actors()), ""));
         for (var caption : document.captions()) rows.add(new CueRow(caption.startFrame(), "Caption", caption.text().replace('\n', ' '), ""));
         for (var cue : document.dialogue()) rows.add(new CueRow(cue.startFrame(), "Dialogue / "+StageplayDialogue.speakerName(document,cue),
                 cue.text().replace('\n',' '),cue.speakerActor()));
@@ -355,7 +394,7 @@ final class StageplayChromeShell {
         for (var effect : document.cameraEffects()) rows.add(new CueRow(effect.startFrame(), "Camera shake",
                 effect.amplitudeX() + " / " + effect.amplitudeY() + " px, " + effect.frequency() + " Hz to " + effect.endFrame(), ""));
         for (var change : document.sceneChanges()) rows.add(new CueRow(change.frame(), "Scene change",
-                change.transition() + " / " + change.set().gameId() + " zone " + change.set().zone() + " act " + change.set().act(), ""));
+                change.transition() + " / " + change.set().worldPolicy() + " / " + change.set().gameId() + " zone " + change.set().zone() + " act " + change.set().act(), ""));
         rows.sort(Comparator.comparingInt(CueRow::frame));
         rowDocument = document;
         cachedRows = List.copyOf(rows);
