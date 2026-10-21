@@ -1,0 +1,124 @@
+package com.openggf.editor.desktop;
+
+import com.openggf.control.InputHandler;
+import com.openggf.data.RomManager;
+import com.openggf.editor.EditorCommandPalette;
+import com.openggf.editor.EditorInputHandler;
+import com.openggf.editor.EditorWindowChrome;
+import com.openggf.editor.LevelEditorController;
+import com.openggf.game.GameServices;
+import com.openggf.mods.scene.host.SceneRomLibrary;
+import com.openggf.mods.scene.host.SceneSurface;
+import com.openggf.stageplay.StageplayDocument;
+import com.openggf.stageplay.StageplayTimeline;
+import com.openggf.editor.stageplay.StageplayWorkspace;
+import com.openggf.stageplay.runtime.StageplayRenderer;
+import com.openggf.stageplay.runtime.StageplayResources;
+import com.openggf.tools.HeadlessGameBoot;
+import org.junit.jupiter.api.Test;
+import org.lwjgl.system.MemoryUtil;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.*;
+
+/**
+ * Display-free desktop Stageplay review images. Origin: 2026-10-21 Stageplay task.
+ * Requires -Dopenggf.stageplay.desktopPictures=true, surfaceless EGL and sonic2.rom.path.
+ * Writes target/stageplay-desktop/*.png; never uses the user's desktop.
+ */
+class TestStageplayChromePictures {
+    @Test
+    void captureActualDesktopStageplayWithRomSetAndActors() throws Exception {
+        assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
+        assertEquals("surfaceless-egl", System.getProperty("openggf.headless.gl"), "No display fallback is allowed");
+        String rom = System.getProperty("sonic2.rom.path", "");
+        assertFalse(rom.isBlank(), "Supply an absolute S2 ROM path");
+        assertTrue(Path.of(rom).isAbsolute() && Files.isRegularFile(Path.of(rom)));
+        try (var boot = new HeadlessGameBoot(1600, 900, 320, 224, 320, 224)) {
+            boot.setBootToTitle(true);
+            boot.boot(Path.of(rom), 0, 0);
+            try (var library = new SceneRomLibrary(GameServices.module(), GameServices.rom().getRom(), RomManager.getInstance());
+                 var resources = new StageplayResources(library, false);
+                 var surface = new SceneSurface();
+                 var chrome = new ImGuiEditorChrome()) {
+                int[] start = GameServices.module().getZoneRegistry().getStartPosition(0, 0);
+                double x = Math.max(0, start[0] - 80), y = Math.max(0, start[1] - 140);
+                var scene = StageplayDocument.empty("s2", 0, 0, x, y, 320, 224).withName("The next adventure")
+                        .withActors(List.of(
+                                new StageplayDocument.Actor("hero", "Sonic", "s2", "sonic", List.of(key(0, x + 80, start[1], -1), key(120, x + 160, start[1], 1))),
+                                new StageplayDocument.Actor("friend", "Tails", "s2", "tails", List.of(key(0, x + 220, start[1], -1)))))
+                        .withCaptions(List.of(new StageplayDocument.Caption("greeting", 0, 180, "Ready for another adventure?", 12, 190, -1)))
+                        .withAudio(List.of(new StageplayDocument.AudioCue("music", 0, StageplayDocument.AudioKind.ROM_MUSIC, "s2", 129, "", 1)));
+                var workspace = new StageplayWorkspace(() -> scene);
+                workspace.activate();
+                workspace.selectActor("hero");
+                workspace.seek(60);
+                var controller = new LevelEditorController();
+                chrome.init(new EditorWindowChrome.Host() {
+                    public LevelEditorController controller() { return controller; }
+                    public void dispatch(EditorInputHandler.Action action) { fail("Stageplay cannot dispatch terrain edits"); }
+                    public List<EditorCommandPalette.HostCommand> commands() { return List.of(); }
+                    public StageplayWorkspace stageplay() { return workspace; }
+                }, 1);
+                var renderer = new StageplayRenderer(resources);
+                for (int frame : new int[] {0, 60, 120}) for (var actor : StageplayTimeline.sample(scene, frame).actors()) {
+                    var sprite = resources.character(actor.gameId(), actor.character()).frame(renderer.mappingFrame(actor));
+                    assertTrue(java.util.Arrays.stream(sprite.image().pixels()).anyMatch(pixel -> (pixel >>> 24) != 0),
+                            "The pictured cast must resolve visible ROM artwork: " + actor.actorId() + " at frame " + frame);
+                }
+                surface.record(320, 224, canvas -> renderer.draw(scene, StageplayTimeline.sample(scene, 60), canvas));
+                assertTrue(chrome.setActive(true));
+                for (int i = 0; i < 4; i++) render(chrome, surface);
+                capture("workspace");
+                chrome.key(GLFW_KEY_F1, GLFW_PRESS, 0);
+                render(chrome, surface);
+                render(chrome, surface);
+                capture("commands");
+                assertEquals(GL_NO_ERROR, glGetError());
+            }
+        }
+    }
+
+    private static StageplayDocument.ActorKey key(int frame, double x, double y, int pose) {
+        // S2 mapping frame zero is empty. WAIT (5) resolves the shipped standing frames.
+        return new StageplayDocument.ActorKey(frame, x, y, 5, pose, false, true, 1, StageplayDocument.Interpolation.LINEAR);
+    }
+
+    private static void render(ImGuiEditorChrome chrome, SceneSurface surface) {
+        assertTrue(chrome.update(new InputHandler()));
+        int[] viewport = chrome.gameViewport(1600, 900, 1600, 900, 320, 224);
+        glViewport(0, 0, 1600, 900);
+        glDisable(GL_SCISSOR_TEST);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+        surface.render(SceneSurface.projection(320, 224), viewport);
+        chrome.render(1600, 900, 1600, 900);
+    }
+
+    private static void capture(String name) throws Exception {
+        glFinish();
+        ByteBuffer pixels = MemoryUtil.memAlloc(1600 * 900 * 4);
+        try {
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glReadPixels(0, 0, 1600, 900, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+            var image = new BufferedImage(1600, 900, BufferedImage.TYPE_INT_RGB);
+            for (int y = 0; y < 900; y++) for (int x = 0; x < 1600; x++) {
+                int at = ((899 - y) * 1600 + x) * 4;
+                image.setRGB(x, y, (pixels.get(at) & 255) << 16 | (pixels.get(at + 1) & 255) << 8 | pixels.get(at + 2) & 255);
+            }
+            Path output = Path.of("target", "stageplay-desktop", name + ".png");
+            Files.createDirectories(output.getParent());
+            assertTrue(ImageIO.write(image, "png", output.toFile()));
+        } finally { MemoryUtil.memFree(pixels); }
+    }
+}

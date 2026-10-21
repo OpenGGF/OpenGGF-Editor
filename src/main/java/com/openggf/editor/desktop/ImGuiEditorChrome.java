@@ -3,6 +3,8 @@ package com.openggf.editor.desktop;
 import com.openggf.control.InputHandler;
 import com.openggf.editor.EditorCommandPalette;
 import com.openggf.editor.EditorWindowChrome;
+import com.openggf.editor.stageplay.StageplayWorkspace;
+import com.openggf.editor.stageplay.StageplayWorkspace.Action;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayDeque;
@@ -20,6 +22,7 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
 
     private final EditorChromeHost host = new EditorChromeHost();
     private EditorChromeShell shell;
+    private StageplayChromeShell stageplayShell;
     private Host engine;
     private boolean active;
     private boolean viewportOverridden;
@@ -33,12 +36,14 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
         this.engine = engine;
         host.init(framebufferScale);
         shell = new EditorChromeShell(host);
+        stageplayShell = new StageplayChromeShell(host);
     }
 
     @Override
     public boolean setActive(boolean editorFrame) {
         active = editorFrame && host.isInitialized();
         if (!active && shell != null) shell.closeCommandPalette();
+        if (!active && stageplayShell != null) stageplayShell.closeCommandPalette();
         return active;
     }
 
@@ -61,7 +66,8 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
         int ay = Math.round((area.y() + CANVAS_MARGIN) * sy);
         int aw = Math.max(1, Math.round((area.width() - 2 * CANVAS_MARGIN) * sx));
         int ah = Math.max(1, Math.round((area.height() - 2 * CANVAS_MARGIN - CAPTION_HEIGHT) * sy));
-        int[] fit = EditorChromeHost.fitIntegerViewport(ax, ay, aw, ah, logicalWidth, logicalHeight);
+        int[] fit = stageplayActive() ? StageplayChromeShell.fitPreview(ax, ay, aw, ah, logicalWidth, logicalHeight)
+                : EditorChromeHost.fitIntegerViewport(ax, ay, aw, ah, logicalWidth, logicalHeight);
         // Remember the window-space rectangle for the canvas frame drawn by the shell.
         game[0] = Math.round(fit[0] / sx);
         game[1] = Math.round(fit[1] / sy);
@@ -78,20 +84,37 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
         host.beginFrame(windowWidth, windowHeight, framebufferWidth, framebufferHeight);
         // Playtest, save and project commands switch modes and load levels; that belongs in the
         // editor tick, not after the frame's final display pass, so drawing only queues them.
-        List<EditorCommandPalette.HostCommand> commands = engine.commands().stream()
-                .map(command -> new EditorCommandPalette.HostCommand(command.label(),
-                        () -> pending.addLast(command.action())))
-                .toList();
-        canvas = shell.draw(new EditorChromeShell.Frame(engine.controller(),
-                action -> pending.addLast(() -> engine.dispatch(action)), commands,
-                game[0], game[1], game[2], game[3], game[4]));
-        host.endFrameAndRender();
+        try {
+            if (stageplayActive()) {
+                canvas = stageplayShell.draw(new StageplayChromeShell.Frame(engine.stageplay(), pending::addLast,
+                        game[0], game[1], game[2], game[3], game[4]));
+            } else {
+                var commands = new java.util.ArrayList<EditorCommandPalette.HostCommand>();
+                for (var command : engine.commands()) commands.add(new EditorCommandPalette.HostCommand(command.label(),
+                        () -> pending.addLast(command.action())));
+                if (engine.stageplay() != null && commands.stream().noneMatch(command -> command.label().toLowerCase(java.util.Locale.ROOT).contains("stageplay")))
+                    commands.add(new EditorCommandPalette.HostCommand("Stageplay workspace (F4)",
+                            () -> pending.addLast(engine.stageplay()::activate)));
+                canvas = shell.draw(new EditorChromeShell.Frame(engine.controller(),
+                        action -> pending.addLast(() -> engine.dispatch(action)), List.copyOf(commands),
+                        game[0], game[1], game[2], game[3], game[4]));
+            }
+        } finally { host.endFrameAndRender(); }
     }
 
     @Override
     public boolean update(InputHandler input) {
+        boolean wasStageplay = stageplayActive();
         while (!pending.isEmpty()) pending.removeFirst().run();
-        return shell != null && shell.isCommandPaletteOpen();
+        // Consume the transition tick too: a click or held key cannot paint terrain on exit.
+        return wasStageplay || stageplayActive() || paletteOpen();
+    }
+
+    private boolean stageplayActive() { return engine != null && engine.stageplay() != null && engine.stageplay().active(); }
+
+    private boolean paletteOpen() {
+        return stageplayActive() ? stageplayShell != null && stageplayShell.isCommandPaletteOpen()
+                : shell != null && shell.isCommandPaletteOpen();
     }
 
     @Override
@@ -105,26 +128,73 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
         if (!active) return true;
         host.onMouseButton(button, action);
         // Releases always reach the engine so a stroke that started in the canvas can finish.
-        return action == GLFW.GLFW_RELEASE || (!shell.isCommandPaletteOpen() && !host.wantsMouse());
+        return action == GLFW.GLFW_RELEASE || (!stageplayActive() && !paletteOpen() && !host.wantsMouse());
     }
 
     @Override
     public boolean scroll(double xOffset, double yOffset) {
         if (!active) return true;
         host.onScroll(xOffset, yOffset);
-        return !shell.isCommandPaletteOpen() && !host.wantsMouse();
+        return !stageplayActive() && !paletteOpen() && !host.wantsMouse();
     }
 
     @Override
     public boolean key(int key, int action, int mods) {
         if (!active) return true;
         host.onKey(key, action, mods);
+        StageplayWorkspace workspace = engine == null ? null : engine.stageplay();
+        if (workspace != null && key == GLFW.GLFW_KEY_F4 && action == GLFW.GLFW_PRESS) {
+            pending.addLast(() -> {
+                if (workspace.active()) workspace.deactivate(); else workspace.activate();
+                if (shell != null) shell.closeCommandPalette();
+                if (stageplayShell != null) stageplayShell.closeCommandPalette();
+            });
+            return false;
+        }
+        if (stageplayActive()) return stageplayKey(workspace, key, action, mods);
         if (key == GLFW.GLFW_KEY_F1 && action == GLFW.GLFW_PRESS) {
             if (shell.isCommandPaletteOpen()) shell.closeCommandPalette();
             else shell.openCommandPalette();
             return false;
         }
-        return action == GLFW.GLFW_RELEASE || (!shell.isCommandPaletteOpen() && !host.wantsKeyboard());
+        return action == GLFW.GLFW_RELEASE || (!paletteOpen() && !host.wantsKeyboard());
+    }
+
+    private boolean stageplayKey(StageplayWorkspace workspace, int key, int action, int mods) {
+        if (action == GLFW.GLFW_RELEASE) return true;
+        if (workspace.recording()) {
+            if (action == GLFW.GLFW_PRESS && (key == GLFW.GLFW_KEY_SPACE || key == GLFW.GLFW_KEY_ESCAPE)) {
+                pending.addLast(() -> workspace.invoke(Action.STOP));
+                return false;
+            }
+            return key == GLFW.GLFW_KEY_W || key == GLFW.GLFW_KEY_A || key == GLFW.GLFW_KEY_S || key == GLFW.GLFW_KEY_D;
+        }
+        if (action != GLFW.GLFW_PRESS) return false;
+        if (key == GLFW.GLFW_KEY_F1) { stageplayShell.toggleCommandPalette(); return false; }
+        if (key == GLFW.GLFW_KEY_ESCAPE && paletteOpen()) { stageplayShell.closeCommandPalette(); return false; }
+        if (paletteOpen() || host.wantsKeyboard()) return false;
+        boolean control = (mods & (GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_SUPER)) != 0;
+        boolean shift = (mods & GLFW.GLFW_MOD_SHIFT) != 0;
+        Action command = null;
+        if (control) {
+            if (key == GLFW.GLFW_KEY_S) command = shift ? Action.SAVE_AS : Action.SAVE;
+            else if (key == GLFW.GLFW_KEY_Z) command = shift ? Action.REDO : Action.UNDO;
+            else if (key == GLFW.GLFW_KEY_Y) command = Action.REDO;
+        } else {
+            if (key == GLFW.GLFW_KEY_SPACE) command = Action.PLAY;
+            else if (key == GLFW.GLFW_KEY_K) command = Action.SET_KEY;
+            else if (key == GLFW.GLFW_KEY_DELETE) command = Action.DELETE_KEY;
+            else if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_RIGHT) {
+                int direction = key == GLFW.GLFW_KEY_LEFT ? -1 : 1;
+                pending.addLast(() -> workspace.seek(workspace.controller().frame() + direction * (shift ? 60 : 1)));
+            } else if (key == GLFW.GLFW_KEY_HOME) pending.addLast(() -> workspace.seek(0));
+            else if (key == GLFW.GLFW_KEY_END) pending.addLast(() -> workspace.seek(workspace.controller().document().durationFrames() - 1));
+        }
+        if (command != null) {
+            Action chosen = command;
+            pending.addLast(() -> workspace.invoke(chosen));
+        }
+        return false;
     }
 
     @Override
