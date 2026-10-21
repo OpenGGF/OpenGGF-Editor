@@ -170,6 +170,27 @@ class TestStageplayChrome {
         assertEquals(List.of("Camera","Camera shake","Camera","Scene change"),rows.stream().map(StageplayChromeShell.CueRow::track).toList());
     }
 
+    @Test
+    void dialogueCommandsAreQueuedAndTimelineUsesSpeakerNames() {
+        var workspace=workspace(); workspace.activate();
+        var queue=new ArrayDeque<Runnable>();
+        var frame=new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
+        frame.invoke(StageplayWorkspace.Action.DIALOGUE);
+        assertFalse(workspace.menu().isOpen()); queue.removeFirst().run();
+        assertEquals("Dialogue lines",workspace.menu().title()); workspace.menu().close();
+        frame.invoke(StageplayWorkspace.Action.DIALOGUE_TYPERS); queue.removeFirst().run();
+        assertEquals("Reusable dialogue typers",workspace.menu().title()); workspace.menu().close();
+        frame.invoke(StageplayWorkspace.Action.DIALOGUE_SKINS); queue.removeFirst().run();
+        assertEquals("Reusable dialogue decorations",workspace.menu().title()); workspace.menu().close();
+        workspace.invoke(StageplayWorkspace.Action.ADD_ACTOR); workspace.menu().setValue("name","Sonic"); workspace.menu().submit();
+        String actor=workspace.controller().selectedActorId();
+        var doc=workspace.controller().document().withDialogue(List.of(new StageplayDocument.DialogueCue(
+                "speech",20,100,actor,"","Hello!","","",8,140,304,72,"",List.of())));
+        var rows=new StageplayChromeShell(new EditorChromeHost()).cueRows(doc);
+        var row=rows.stream().filter(r -> r.track().equals("Dialogue / Sonic")).findFirst().orElseThrow();
+        assertEquals(20,row.frame()); assertEquals("Hello!",row.detail()); assertEquals(actor,row.actorId());
+    }
+
     private static StageplayWorkspace workspace() {
         return new StageplayWorkspace(() -> StageplayDocument.empty("s2", 0, 0, 0, 0, 320, 224));
     }

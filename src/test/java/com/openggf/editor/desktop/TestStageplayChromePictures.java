@@ -6,6 +6,7 @@ import com.openggf.editor.EditorCommandPalette;
 import com.openggf.editor.EditorInputHandler;
 import com.openggf.editor.EditorWindowChrome;
 import com.openggf.editor.LevelEditorController;
+import com.openggf.editor.project.EditorProjectMenuRenderer;
 import com.openggf.game.GameServices;
 import com.openggf.mods.scene.host.SceneRomLibrary;
 import com.openggf.mods.scene.host.SceneSurface;
@@ -50,6 +51,7 @@ class TestStageplayChromePictures {
             try (var library = new SceneRomLibrary(GameServices.module(), GameServices.rom().getRom(), RomManager.getInstance());
                  var resources = new StageplayResources(library, false);
                  var surface = new SceneSurface();
+                 var menuRenderer = new EditorProjectMenuRenderer();
                  var chrome = new ImGuiEditorChrome()) {
                 int[] start = GameServices.module().getZoneRegistry().getStartPosition(0, 0);
                 double x = Math.max(0, start[0] - 80), y = Math.max(0, start[1] - 140);
@@ -63,7 +65,15 @@ class TestStageplayChromePictures {
                         .withSceneChanges(List.of(new StageplayDocument.SceneChange("next-shot",240,
                                 new StageplayDocument.SetSource("s2",0,1,"",""),StageplayDocument.Transition.FADE_BLACK,30)))
                         .withCaptions(List.of(new StageplayDocument.Caption("greeting", 0, 180, "Ready for another adventure?", 12, 190, -1)))
-                        .withAudio(List.of(new StageplayDocument.AudioCue("music", 0, StageplayDocument.AudioKind.ROM_MUSIC, "s2", 129, "", 1)));
+                        .withAudio(List.of(new StageplayDocument.AudioCue("music", 0, StageplayDocument.AudioKind.ROM_MUSIC, "s2", 129, "", 1)))
+                        .withDialogueTypers(List.of(new StageplayDocument.DialogueTyper("conversation",3,8,0)))
+                        .withDialogueSkins(List.of(new StageplayDocument.DialogueSkin("warm",0xfff5f0df,0xffffcf66,
+                                0xff172338,0xffa8b8cf,6,"",0,true)))
+                        .withDialogue(List.of(new StageplayDocument.DialogueCue("spoken-greeting",0,180,"hero","",
+                                "Tails, ready for another adventure?","warm","conversation",12,8,360,62,"",List.of())));
+                var line = StageplayTimeline.sample(scene,60).dialogue().getFirst();
+                assertEquals("Sonic",line.speakerName());
+                assertFalse(line.visibleText().isEmpty());
                 var workspace = new StageplayWorkspace(() -> scene);
                 workspace.activate();
                 workspace.selectActor("hero");
@@ -90,12 +100,39 @@ class TestStageplayChromePictures {
                 render(chrome, surface,scene,1600,900);
                 capture("commands",1600,900);
                 chrome.key(GLFW_KEY_ESCAPE,GLFW_PRESS,0); chrome.update(new InputHandler());
-                workspace.invoke(StageplayWorkspace.Action.CAMERA_MODE); workspace.moveCamera(8,0,1.1);
+                workspace.invoke(StageplayWorkspace.Action.CAMERA_MODE); workspace.moveCamera(8,0,2);
                 surface.record(scene.width(),scene.height(),canvas -> renderer.draw(workspace.previewDocument(),workspace.previewFrame(),canvas));
                 for (int i=0;i<4;i++) render(chrome,surface,scene,1280,720);
                 capture("camera-720p",1280,720);
                 for (int i=0;i<4;i++) render(chrome,surface,scene,1024,576);
                 capture("camera-small",1024,576);
+
+                // The production host disables desktop chrome while the shared native modal owns input.
+                chrome.setActive(false);
+                workspace.invoke(StageplayWorkspace.Action.DIALOGUE);
+                choose(workspace,3); // Existing Sonic line, after Add / typers / decorations.
+                assertEquals("Sonic / dialogue",workspace.menu().title());
+                renderMenu(menuRenderer,workspace,1600,900);
+                capture("dialogue-line-menu",1600,900);
+                choose(workspace,0);
+                assertEquals("Dialogue line",workspace.menu().title());
+                assertEquals(scene.dialogue().getFirst().text(),workspace.menu().values().get("text"));
+                renderMenu(menuRenderer,workspace,1600,900);
+                capture("dialogue-line-form",1600,900);
+
+                workspace.menu().close();
+                workspace.invoke(StageplayWorkspace.Action.DIALOGUE_SKINS);
+                choose(workspace,1); // Existing warm decoration profile.
+                assertEquals("Decoration: warm",workspace.menu().title());
+                renderMenu(menuRenderer,workspace,1600,900);
+                capture("dialogue-decoration-menu",1600,900);
+                choose(workspace,0);
+                assertEquals("Decoration: warm",workspace.menu().title());
+                assertEquals("FFFFCF66",workspace.menu().values().get("name"));
+                renderMenu(menuRenderer,workspace,1600,900);
+                capture("dialogue-decoration-form",1600,900);
+                workspace.menu().close();
+                assertEquals(scene,workspace.controller().document(),"Reviewing forms must not change the scene");
                 assertEquals(GL_NO_ERROR, glGetError());
             }
         }
@@ -117,6 +154,30 @@ class TestStageplayChromePictures {
         glViewport(fitted[0], fitted[1], fitted[2], fitted[3]);
         surface.render(SceneSurface.projection(scene.width(),scene.height()), fitted);
         chrome.render(width,height,width,height);
+    }
+
+    private static void renderMenu(EditorProjectMenuRenderer renderer,StageplayWorkspace workspace,int width,int height) {
+        assertTrue(workspace.menu().isOpen());
+        glViewport(0,0,width,height);
+        glDisable(GL_SCISSOR_TEST);
+        glClearColor(0,0,0,1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        int[] fit=StageplayChromeShell.fitPreview(0,0,width,height,320,224);
+        glViewport(fit[0],height-fit[1]-fit[3],fit[2],fit[3]);
+        renderer.render(workspace.menu(),SceneSurface.projection(320,224),320);
+    }
+
+    private static void choose(StageplayWorkspace workspace,int row) {
+        assertTrue(workspace.menu().isOpen());
+        var input=new InputHandler();
+        for (int i=0;i<row;i++) press(workspace,input,GLFW_KEY_DOWN);
+        press(workspace,input,GLFW_KEY_ENTER);
+    }
+
+    private static void press(StageplayWorkspace workspace,InputHandler input,int key) {
+        input.handleKeyEvent(key,GLFW_PRESS); input.refreshLogicalSnapshot();
+        assertTrue(workspace.tick(input)); input.update();
+        input.handleKeyEvent(key,GLFW_RELEASE); input.update();
     }
 
     private static void capture(String name,int width,int height) throws Exception {

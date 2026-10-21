@@ -1,6 +1,7 @@
 package com.openggf.editor.desktop;
 
 import com.openggf.stageplay.StageplayDocument;
+import com.openggf.stageplay.StageplayDialogue;
 import com.openggf.editor.stageplay.StageplayWorkspace;
 import com.openggf.editor.stageplay.StageplayWorkspace.Action;
 import imgui.ImGui;
@@ -118,7 +119,7 @@ final class StageplayChromeShell {
                 try {
                     for (Action action : List.of(Action.ADD_ACTOR, Action.EDIT_ACTOR, Action.DELETE_ACTOR,
                             Action.SET_KEY, Action.DELETE_KEY, Action.CAMERA_MODE, Action.SET_CAMERA_KEY, Action.CAMERA_KEY,
-                            Action.RECORD_CAMERA, Action.CAMERA_EFFECTS, Action.SCENE_CHANGES, Action.CAPTION, Action.AUDIO, Action.RECORD))
+                            Action.RECORD_CAMERA, Action.CAMERA_EFFECTS, Action.SCENE_CHANGES, Action.CAPTION, Action.DIALOGUE, Action.DIALOGUE_TYPERS, Action.DIALOGUE_SKINS, Action.AUDIO, Action.RECORD))
                         menuItem(frame, action, "");
                 } finally { ImGui.endMenu(); }
             }
@@ -158,13 +159,13 @@ final class StageplayChromeShell {
                 if (frame.workspace.recording()) frame.queue.accept(frame.workspace::stop);
                 else frame.invoke(frame.workspace.cameraMode() ? Action.RECORD_CAMERA : Action.RECORD);
             }
-            if (ImGui.isItemHovered()) ImGui.setTooltip("One recorded take is one undo step. WASD directs actors; camera mode also uses arrows and Q/E zoom.");
+            if (ImGui.isItemHovered()) ImGui.setTooltip("One recorded take is one undo step. WASD directs actors; camera mode also uses arrows and Q/E integer zoom.");
             ImGui.sameLine();
             ImGui.beginDisabled(frame.workspace.recording());
             if (ImGui.button(frame.workspace.cameraMode() ? "Camera mode ON  C" : "Direct camera  C")) frame.invoke(Action.CAMERA_MODE);
             ImGui.endDisabled();
             ImGui.textDisabled(frame.workspace.cameraMode()
-                    ? "CAMERA: WASD / arrows pan | Q / E zoom | K capture key | R record | C exit"
+                    ? "CAMERA: WASD / arrows pan | Q / E integer zoom | K capture key | R record | C exit"
                     : frame.workspace.controller().document().name() + "   |   C camera direction   |   F1 all commands");
         }
         ImGui.end();
@@ -226,6 +227,7 @@ final class StageplayChromeShell {
             if (ImGui.button("Camera shake / quake", -1, 0)) frame.invoke(Action.CAMERA_EFFECTS);
             if (ImGui.button("Scene changes / transitions", -1, 0)) frame.invoke(Action.SCENE_CHANGES);
             if (ImGui.button("Film format presets", -1, 0)) frame.invoke(Action.FILM_FORMAT);
+            if (ImGui.button("Dialogue / speakers", -1, 0)) frame.invoke(Action.DIALOGUE);
             if (ImGui.button("Caption", -1, 0)) frame.invoke(Action.CAPTION);
             if (ImGui.button("Sound, music or voice", -1, 0)) frame.invoke(Action.AUDIO);
         }
@@ -242,7 +244,8 @@ final class StageplayChromeShell {
                 ImGui.textColored(EditorChromeTheme.SELECTION, "CAMERA DIRECTION");
                 ImGui.text("Position: " + coordinate(camera.x()) + ", " + coordinate(camera.y()));
                 ImGui.text("Zoom: " + coordinate(camera.zoom()));
-                ImGui.textWrapped("WASD / arrows pan. Q / E zoom around the film centre. Shift moves faster. K captures this framing.");
+                if (camera.zoom()!=Math.rint(camera.zoom())) ImGui.textWrapped("Imported fractional zoom: use Q/E or capture integer framing to avoid shimmer.");
+                ImGui.textWrapped("WASD / arrows pan. Q / E step integer zoom around the film centre. Hold to repeat. Shift moves faster. K captures framing; zoom cuts at keys.");
                 if (ImGui.button("Capture camera key  K", -1, 0)) frame.invoke(Action.SET_CAMERA_KEY);
                 if (ImGui.button("Edit / remove camera key", -1, 0)) frame.invoke(Action.CAMERA_KEY);
                 if (ImGui.button("Record camera take  R", -1, 0)) frame.invoke(Action.RECORD_CAMERA);
@@ -325,6 +328,8 @@ final class StageplayChromeShell {
             rows.add(new CueRow(key.frame(), actor.name(), key.pose() >= 0 ? "Pose " + key.pose() : "Animation " + key.animation(), actor.id()));
         for (var key : document.camera()) rows.add(new CueRow(key.frame(), "Camera", key.interpolation().name(), ""));
         for (var caption : document.captions()) rows.add(new CueRow(caption.startFrame(), "Caption", caption.text().replace('\n', ' '), ""));
+        for (var cue : document.dialogue()) rows.add(new CueRow(cue.startFrame(), "Dialogue / "+StageplayDialogue.speakerName(document,cue),
+                cue.text().replace('\n',' '),cue.speakerActor()));
         for (var cue : document.audio()) rows.add(new CueRow(cue.frame(), "Audio", cue.kind().name(), ""));
         for (var effect : document.cameraEffects()) rows.add(new CueRow(effect.startFrame(), "Camera shake",
                 effect.amplitudeX() + " / " + effect.amplitudeY() + " px, " + effect.frequency() + " Hz to " + effect.endFrame(), ""));

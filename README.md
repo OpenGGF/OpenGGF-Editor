@@ -41,7 +41,7 @@ in OpenGGF.
 With a level open, press **F4** or choose **File → Stageplay workspace**. Add an actor,
 move the playhead, and choose **Set / edit key at playhead** to author movement or a
 pose. The **Direct** menu also exposes camera keys, shake/quake effects, scene changes,
-captions and audio cues. Property
+dialogue, captions and audio cues. Property
 forms use the engine's keyboard, mouse and controller controls; choose a field, edit
 it, then use the form's final action to apply the change.
 
@@ -52,20 +52,38 @@ command. The **Record actor** button records WASD movement as a baked visual
 performance; **Space** or **Stop** finishes the take. Recorded direction does not run
 native character physics.
 
-Press **C** for camera direction. **WASD / arrows** pan, **Q / E** zoom around the film
-centre, and **Shift** pans faster. **K** captures the framing as a camera key; **R**
+Press **C** for camera direction. **WASD / arrows** pan, **Q / E** step integer zoom around the film
+centre (hold to repeat), and **Shift** pans faster. **K** captures the framing as a camera key; **R**
 records a camera take with the same controls, committed as one undo step. **Space**
 finishes recording. Framing remains a preview until captured; seeking discards unkeyed
 framing. Numeric camera properties and key removal remain available in **Direct →
 Camera keys**. Shake/quake effects have their own interval, amplitudes, frequency and
-seed, so they layer over pan and zoom without changing camera keys.
+seed, so they layer over pan and framing without changing camera keys. Pans interpolate;
+zoom stays fixed until the next camera key and changes as a cut. New framing uses integer
+zoom (1x–64x); camera properties also offer 1x–4x presets. Imported fractional zoom is
+preserved, but can shimmer during movement and is best replaced with integer framing.
 
 **Scene changes / transitions** adds, edits or deletes a switch to another ROM set or
 relative `.ogfproject`. Choose a cut, black/white fade or left/right wipe. Transitions
 are centred on the switch frame and cannot overlap. Inserting or moving a change adds
 incoming actor and camera keys together; position those keys for the new shot. Removing
-a change keeps its keys. Both editors save these tracks in version-two `.stageplay`
-documents and can open existing version-one scenes.
+a change keeps its keys. Both editors save version-three `.stageplay` documents and
+can open existing version-one and version-two scenes.
+
+**Direct → Dialogue lines** creates named speech panels. Choose a cast member or an
+explicit offscreen speaker, then edit the text, interval and panel position. Actor
+names appear immediately; text reveals along the timeline. A line's menu selects a
+reusable **typer** (character speed and punctuation/space pauses) and **decoration**
+(colors, padding, speaker pointer and optional PNG frame). These profiles can also be
+created and edited from the Direct menu. Decorations can preserve PNG corners while
+stretching edges and the centre; optional portrait PNGs belong to individual lines.
+
+Use **Custom reveal timing** for exact character timing, with offsets measured from
+the line's start; combining characters stay together. Long schedules are split into
+editable groups and preserved when other fields change. **Use typer timing** restores
+the reusable rhythm. Typing itself is silent; use an audio cue for a voice or sound.
+Deleting a profile returns its lines to the built-in default in one undo step. Removing
+a speaking actor offers to retain named offscreen speech or remove their lines.
 
 Windowed authoring requests a temporary 16:9 window of at least **1280 × 720**, reduced
 to fit smaller screens. Leaving Stageplay restores the previous window size and removes
@@ -76,8 +94,9 @@ the preview preserves film aspect with letterboxing, and sprites are never stret
 
 Stageplay `.stageplay` files are shared with OpenGGF's built-in editor: save in either
 interface and reopen in the other without conversion. Scene files reference your ROMs
-and creator assets. Keep imported voice assets and optional authored level projects
-under the scene folder. **File → Export film** uses the engine's shared exporter.
+and creator assets. Keep imported voice, decoration and portrait assets, and optional authored level
+projects under the scene folder. Save As preserves relative asset paths and refuses
+to move the scene away from assets still referenced by its undo or redo history. **File → Export film** uses the engine's shared exporter.
 **F4** returns to level editing and keeps the scene and its undo history available.
 
 The initial scene workflow is linear and uses load-state scenery; dynamic level events,
