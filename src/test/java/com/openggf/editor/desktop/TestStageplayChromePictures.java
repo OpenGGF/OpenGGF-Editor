@@ -74,7 +74,12 @@ class TestStageplayChromePictures {
                 var line = StageplayTimeline.sample(scene,60).dialogue().getFirst();
                 assertEquals("Sonic",line.speakerName());
                 assertFalse(line.visibleText().isEmpty());
-                var workspace = new StageplayWorkspace(() -> scene);
+                var workspace = new StageplayWorkspace(new StageplayWorkspace.Host() {
+                    public StageplayDocument initialDocument() { return scene; }
+                    public StageplayTimeline.Frame resolvePreview(StageplayDocument document,Path root,int frame) throws java.io.IOException {
+                        return resources.resolveFrame(document,StageplayTimeline.sample(document,frame));
+                    }
+                });
                 workspace.activate();
                 workspace.selectActor("hero");
                 workspace.seek(60);
@@ -133,6 +138,34 @@ class TestStageplayChromePictures {
                 capture("dialogue-decoration-form",1600,900);
                 workspace.menu().close();
                 assertEquals(scene,workspace.controller().document(),"Reviewing forms must not change the scene");
+
+                // Exercise the real conversion, goal form and native resolver for the physical actor inspector.
+                workspace.invoke(StageplayWorkspace.Action.CAMERA_MODE);
+                workspace.seek(0);
+                workspace.invoke(StageplayWorkspace.Action.EDIT_ACTOR);
+                workspace.menu().setValue("mode","PUPPET"); workspace.menu().submit(); choose(workspace,0);
+                assertTrue(workspace.selectedActorIsPuppet());
+                workspace.invoke(StageplayWorkspace.Action.SET_KEY); choose(workspace,0);
+                workspace.menu().setValue("x",Double.toString(start[0]+112));
+                workspace.menu().setValue("y",Integer.toString(start[1])); workspace.menu().setValue("urgency","0.65"); workspace.menu().submit();
+                assertNull(workspace.menu().error());
+                workspace.seek(20); workspace.invoke(StageplayWorkspace.Action.SET_KEY); choose(workspace,1); workspace.menu().submit();
+                assertNull(workspace.menu().error());
+                workspace.seek(60);
+                var physical=workspace.controller().document(); var resolved=workspace.previewFrame();
+                assertNotEquals(StageplayTimeline.PuppetStatus.UNRESOLVED,resolved.puppets().getFirst().status());
+                assertNotEquals((double)start[0],resolved.actors().stream().filter(a -> a.actorId().equals("hero")).findFirst().orElseThrow().x(),
+                        "The pictured physical role must actually move");
+                surface.record(physical.width(),physical.height(),canvas -> renderer.draw(physical,resolved,canvas));
+                chrome.setActive(true);
+                for (int i=0;i<4;i++) render(chrome,surface,physical,1280,720);
+                capture("physics-720p",1280,720);
+                chrome.setActive(false);
+                workspace.invoke(StageplayWorkspace.Action.SET_KEY);
+                renderMenu(menuRenderer,workspace,1600,900); capture("physics-actions",1600,900);
+                choose(workspace,0);
+                renderMenu(menuRenderer,workspace,1600,900); capture("physics-goal-form",1600,900);
+                workspace.menu().close();
                 assertEquals(GL_NO_ERROR, glGetError());
             }
         }

@@ -55,6 +55,7 @@ class TestStageplayChrome {
         assertFalse(workspace.menu().isOpen());
         queue.removeFirst().run();
         workspace.menu().setValue("name", "Lead");
+        workspace.menu().setValue("mode", "POSER");
         workspace.menu().submit();
         String actor = workspace.controller().document().actors().getFirst().id();
         frame.select(actor);
@@ -84,6 +85,7 @@ class TestStageplayChrome {
         var workspace = workspace();
         workspace.activate();
         workspace.invoke(StageplayWorkspace.Action.ADD_ACTOR);
+        workspace.menu().setValue("mode", "POSER");
         workspace.menu().submit();
         workspace.invoke(StageplayWorkspace.Action.RECORD);
         assertTrue(workspace.recording());
@@ -189,6 +191,31 @@ class TestStageplayChrome {
         var rows=new StageplayChromeShell(new EditorChromeHost()).cueRows(doc);
         var row=rows.stream().filter(r -> r.track().equals("Dialogue / Sonic")).findFirst().orElseThrow();
         assertEquals(20,row.frame()); assertEquals("Hello!",row.detail()); assertEquals(actor,row.actorId());
+    }
+
+    @Test
+    void physicalDirectionUsesSharedFormsAndListsGoalsWithNativeActions() throws Exception {
+        var workspace=workspace(); workspace.activate();
+        workspace.invoke(StageplayWorkspace.Action.ADD_ACTOR); workspace.menu().submit();
+        assertTrue(workspace.selectedActorIsPuppet());
+        var chrome=chrome(workspace);
+        assertFalse(chrome.key(GLFW_KEY_K,GLFW_PRESS,0));
+        assertFalse(workspace.menu().isOpen()); chrome.update(new InputHandler());
+        assertEquals("Direct Sonic",workspace.menu().title());
+        var input=new InputHandler(); input.handleKeyEvent(GLFW_KEY_ENTER,GLFW_PRESS); input.refreshLogicalSnapshot(); workspace.menu().update(input);
+        assertEquals("Move to destination",workspace.menu().title());
+        workspace.menu().setValue("x","300"); workspace.menu().setValue("y","112"); workspace.menu().setValue("urgency","0.5"); workspace.menu().submit();
+        var document=workspace.controller().document();
+        var track=document.puppets().getFirst();
+        document=document.withPuppets(List.of(new StageplayDocument.PuppetTrack(track.actorId(),true,0,List.of(
+                track.commands().getFirst(),new StageplayDocument.PuppetCommand("jump",10,StageplayDocument.PuppetCommandKind.JUMP,0,0,0,12),
+                new StageplayDocument.PuppetCommand("stop",40,StageplayDocument.PuppetCommandKind.STOP,0,0,0,0)))));
+        var rows=new StageplayChromeShell(new EditorChromeHost()).cueRows(document);
+        assertEquals(List.of(0,0,0,10,40),rows.stream().map(StageplayChromeShell.CueRow::frame).toList());
+        var move=rows.stream().filter(r -> r.track().endsWith("MOVE_TO")).findFirst().orElseThrow();
+        assertTrue(move.detail().contains("300.00, 112.00 / 50%")); assertEquals(track.actorId(),move.actorId());
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("JUMP")));
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("STOP")));
     }
 
     private static StageplayWorkspace workspace() {
