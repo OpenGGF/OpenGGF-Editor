@@ -11,6 +11,9 @@ import imgui.gl3.ImGuiImplGl3;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -57,10 +60,10 @@ public final class EditorChromeHost implements AutoCloseable {
         lastFrameNanos = System.nanoTime();
     }
 
-    private void loadFonts(ImGuiIO io, float density) {
-        byte[] medium = resource("/fonts/editor/NotoSans-Medium.ttf");
-        byte[] semiBold = resource("/fonts/editor/NotoSans-Bold.ttf");
-        byte[] icons = resource("/fonts/editor/lucide.ttf");
+    void loadFonts(ImGuiIO io, float density) {
+        String medium = "/fonts/editor/NotoSans-Medium.ttf";
+        String semiBold = "/fonts/editor/NotoSans-Bold.ttf";
+        String icons = "/fonts/editor/lucide.ttf";
         var atlas = io.getFonts();
         atlas.clear();
         body = addFont(atlas, medium, BODY_SIZE, density);
@@ -69,6 +72,14 @@ public final class EditorChromeHost implements AutoCloseable {
         mergeIcons(atlas, icons, HEADING_SIZE + 1f, density);
         title = addFont(atlas, semiBold, TITLE_SIZE, density);
         mergeIcons(atlas, icons, TITLE_SIZE, density);
+        // imgui-java 1.92.7.1 also releases Java glyph-range arrays after the JNI call.
+        // Resolve the icons synchronously instead, before the legacy backend uploads its atlas.
+        StringBuilder iconGlyphs = new StringBuilder(0x600);
+        for (char c = '\uE000'; c <= '\uE5FF'; c++) iconGlyphs.append(c);
+        String preload = iconGlyphs.toString();
+        body.calcTextSizeA(BODY_SIZE, Float.MAX_VALUE, 0, preload);
+        heading.calcTextSizeA(HEADING_SIZE, Float.MAX_VALUE, 0, preload);
+        title.calcTextSizeA(TITLE_SIZE, Float.MAX_VALUE, 0, preload);
     }
 
     /**
@@ -76,35 +87,48 @@ public final class EditorChromeHost implements AutoCloseable {
      * shadowed: ImGui 1.92 resolves a codepoint from the first source that has it and treats
      * glyph ranges only as a preload hint. Inter was rejected for carrying 745 PUA glyphs.
      */
-    private static ImFont addFont(imgui.ImFontAtlas atlas, byte[] ttf, float size, float density) {
+    private static ImFont addFont(imgui.ImFontAtlas atlas, String resource, float size, float density) {
         ImFontConfig config = new ImFontConfig();
         try {
             config.setRasterizerDensity(density);
             config.setOversampleH(2);
-            return atlas.addFontFromMemoryTTF(ttf, size, config);
+            return addFontResource(atlas, resource, size, config);
         } finally {
             config.destroy();
         }
     }
 
-    private static void mergeIcons(imgui.ImFontAtlas atlas, byte[] ttf, float size, float density) {
+    private static void mergeIcons(imgui.ImFontAtlas atlas, String resource, float size, float density) {
         ImFontConfig config = new ImFontConfig();
         try {
             config.setMergeMode(true);
             config.setRasterizerDensity(density);
             config.setGlyphMinAdvanceX(size);
             config.setGlyphOffset(0, 2f);
-            // The legacy atlas bakes only requested ranges; Lucide lives in the private-use area.
-            atlas.addFontFromMemoryTTF(ttf, size, config, new short[] {(short) 0xE000, (short) 0xE5FF, 0});
+            addFontResource(atlas, resource, size, config);
         } finally {
             config.destroy();
         }
     }
 
-    private static byte[] resource(String path) {
-        try (InputStream in = EditorChromeHost.class.getResourceAsStream(path)) {
-            if (in == null) throw new IllegalStateException("Missing editor font resource " + path);
-            return in.readAllBytes();
+    /**
+     * The pinned binding releases its Java byte[] pin before ImGui has finished using it.
+     * Its file loader allocates native font data instead. The atlas owns that allocation
+     * until context destruction (including init failure); the extraction is needed only
+     * during this call, so packaged resources work without retaining temporary files.
+     */
+    private static ImFont addFontResource(imgui.ImFontAtlas atlas, String resource, float size, ImFontConfig config) {
+        try (InputStream in = EditorChromeHost.class.getResourceAsStream(resource)) {
+            if (in == null) throw new IllegalStateException("Missing editor font resource " + resource);
+            Path extracted = Files.createTempFile("openggf-editor-font-", ".ttf");
+            try {
+                Files.copy(in, extracted, StandardCopyOption.REPLACE_EXISTING);
+                // ImFontConfig defaults to false in this Java binding, unlike native ImGui.
+                config.setFontDataOwnedByAtlas(true);
+                return atlas.addFontFromFileTTF(extracted.toString(), size, config);
+            } finally {
+                Files.deleteIfExists(extracted);
+            }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

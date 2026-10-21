@@ -1,6 +1,6 @@
 # OpenGGF Editor
 
-A desktop level editor for [OpenGGF](https://github.com/OpenGGF/OpenGGF), built with
+A desktop level and scene editor for [OpenGGF](https://github.com/OpenGGF/OpenGGF), built with
 [Dear ImGui](https://github.com/ocornut/imgui) through
 [imgui-java](https://github.com/SpaiR/imgui-java).
 
@@ -31,6 +31,35 @@ in OpenGGF.
   playtest from the cursor, and a clickable breadcrumb.
 - **Command palette:** every editor command, plus OpenGGF's project commands (new, open,
   import, Save As, playtest).
+- **Stageplay:** a directing workspace with a cast panel, actor/key inspector, frame
+  scrubber and a chronological key/cue list. Direct movement, fixed sprite poses,
+  animations, cameras, captions, sound, music and voice through the same authoring
+  commands used by the in-engine editor.
+
+## Stageplay
+
+With a level open, press **F4** or choose **File → Stageplay workspace**. Add an actor,
+move the playhead, and choose **Set / edit key at playhead** to author movement or a
+pose. The **Direct** menu also exposes camera keys, captions and audio cues. Property
+forms use the engine's keyboard, mouse and controller controls; choose a field, edit
+it, then use the form's final action to apply the change.
+
+**Space** plays or pauses; **Left / Right** steps a frame (**Shift** steps 60 frames).
+**K** opens the selected actor's key at the playhead. **Ctrl+Z / Ctrl+Y** undo and redo;
+**Ctrl+S** saves and **Ctrl+Shift+S** chooses a new path. **F1** lists every Stageplay
+command. The **Record directed take** button records WASD movement as a baked visual
+performance; **Space** or **Stop** finishes the take. Recorded direction does not run
+native character physics.
+
+Stageplay `.stageplay` files are shared with OpenGGF's built-in editor: save in either
+interface and reopen in the other without conversion. Scene files reference your ROMs
+and creator assets. Keep imported voice assets and optional authored level projects
+under the scene folder. **File → Export film** uses the engine's shared exporter.
+**F4** returns to level editing and keeps the scene and its undo history available.
+
+The initial scene workflow is linear and uses load-state scenery; dynamic level events,
+water and live stock objects are not reproduced by the staged set preview. Editor panel
+positions and command-filter text are not saved into the scene.
 
 ## Requirements
 
@@ -81,8 +110,8 @@ the desktop editor on its class path.
   with offscreen rendering and simulated input.
 - **No saved dock layout.** `imgui.ini` is disabled, so panels return to their default
   layout on every start.
-- **The canvas is the engine's fixed camera view.** It is drawn at an integer scale, with
-  no zoom or pan yet.
+- **The level-editing canvas is the engine's fixed camera view.** It is drawn at an
+  integer scale. Stageplay camera keys provide authored pan and zoom for scenes.
 - **No native image.** The editor runs on the JVM. The engine's GraalVM build has not been
   adapted to include it.
 
