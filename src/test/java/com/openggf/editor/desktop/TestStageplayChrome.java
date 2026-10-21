@@ -7,6 +7,7 @@ import com.openggf.editor.EditorWindowChrome;
 import com.openggf.editor.LevelEditorController;
 import com.openggf.stageplay.StageplayDocument;
 import com.openggf.stageplay.StageplayStore;
+import com.openggf.stageplay.StageplayTimeline;
 import com.openggf.editor.stageplay.StageplayWorkspace;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -55,6 +56,7 @@ class TestStageplayChrome {
         assertFalse(workspace.menu().isOpen());
         queue.removeFirst().run();
         workspace.menu().setValue("name", "Lead");
+        workspace.menu().setValue("mode", "POSER");
         workspace.menu().submit();
         String actor = workspace.controller().document().actors().getFirst().id();
         frame.select(actor);
@@ -84,6 +86,7 @@ class TestStageplayChrome {
         var workspace = workspace();
         workspace.activate();
         workspace.invoke(StageplayWorkspace.Action.ADD_ACTOR);
+        workspace.menu().setValue("mode", "POSER");
         workspace.menu().submit();
         workspace.invoke(StageplayWorkspace.Action.RECORD);
         assertTrue(workspace.recording());
@@ -189,6 +192,86 @@ class TestStageplayChrome {
         var rows=new StageplayChromeShell(new EditorChromeHost()).cueRows(doc);
         var row=rows.stream().filter(r -> r.track().equals("Dialogue / Sonic")).findFirst().orElseThrow();
         assertEquals(20,row.frame()); assertEquals("Hello!",row.detail()); assertEquals(actor,row.actorId());
+    }
+
+    @Test
+    void physicalDirectionUsesSharedFormsAndListsGoalsWithNativeActions() throws Exception {
+        var workspace=workspace(); workspace.activate();
+        workspace.invoke(StageplayWorkspace.Action.ADD_ACTOR); workspace.menu().submit();
+        assertTrue(workspace.selectedActorIsPuppet());
+        var chrome=chrome(workspace);
+        assertFalse(chrome.key(GLFW_KEY_K,GLFW_PRESS,0));
+        assertFalse(workspace.menu().isOpen()); chrome.update(new InputHandler());
+        assertEquals("Direct Sonic",workspace.menu().title());
+        var input=new InputHandler(); input.handleKeyEvent(GLFW_KEY_ENTER,GLFW_PRESS); input.refreshLogicalSnapshot(); workspace.menu().update(input);
+        assertEquals("Move to destination",workspace.menu().title());
+        workspace.menu().setValue("x","300"); workspace.menu().setValue("y","112"); workspace.menu().setValue("urgency","0.5"); workspace.menu().submit();
+        var document=workspace.controller().document();
+        var track=document.puppets().getFirst();
+        document=document.withPuppets(List.of(new StageplayDocument.PuppetTrack(track.actorId(),true,0,List.of(
+                track.commands().getFirst(),new StageplayDocument.PuppetCommand("jump",10,StageplayDocument.PuppetCommandKind.JUMP,0,0,0,12),
+                new StageplayDocument.PuppetCommand("stop",40,StageplayDocument.PuppetCommandKind.STOP,0,0,0,0)))));
+        var rows=new StageplayChromeShell(new EditorChromeHost()).cueRows(document);
+        assertEquals(List.of(0,0,0,10,40),rows.stream().map(StageplayChromeShell.CueRow::frame).toList());
+        var move=rows.stream().filter(r -> r.track().endsWith("MOVE_TO")).findFirst().orElseThrow();
+        assertTrue(move.detail().contains("300.00, 112.00 / 50%")); assertEquals(track.actorId(),move.actorId());
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("JUMP")));
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("STOP")));
+    }
+
+    @Test
+    void liveDirectionRoundTripsTargetsWaitsAbilitiesAndFollowThroughSharedForms(@TempDir Path root) throws Exception {
+        var document = StageplayDocument.empty("s3k",0,0,0,0,320,224)
+                .withSet(new StageplayDocument.SetSource("s3k",0,0,"","",StageplayDocument.WorldPolicy.LIVE));
+        var workspace = new StageplayWorkspace(() -> document); workspace.activate();
+        workspace.invoke(StageplayWorkspace.Action.ADD_ACTOR);
+        workspace.menu().setValue("name","Tails"); workspace.menu().setValue("character","tails"); workspace.menu().submit();
+        assertNull(workspace.menu().error());
+        String actor = workspace.controller().selectedActorId();
+        workspace.invoke(StageplayWorkspace.Action.SET_KEY); choose(workspace,0);
+        workspace.menu().setValue("layout","179"); workspace.menu().setValue("object","74");
+        workspace.menu().setValue("subtype","1"); workspace.menu().setValue("offsetX","16");
+        workspace.menu().setValue("timeout","120"); workspace.menu().submit();
+        assertNull(workspace.menu().error());
+        var track=workspace.controller().document().puppets().getFirst();
+        var commands=new java.util.ArrayList<>(track.commands());
+        commands.add(new StageplayDocument.PuppetCommand("wait",1,StageplayDocument.PuppetCommandKind.WAIT,0,0,0,0,
+                track.commands().getFirst().target(),StageplayDocument.WaitCondition.ON_OBJECT,120));
+        commands.add(new StageplayDocument.PuppetCommand("fly",30,StageplayDocument.PuppetCommandKind.FLY_TO,200,80,.5,0));
+        commands.add(new StageplayDocument.PuppetCommand("hover",60,StageplayDocument.PuppetCommandKind.HOVER,0,0,0,30));
+        commands.add(new StageplayDocument.PuppetCommand("release",90,StageplayDocument.PuppetCommandKind.RELEASE,0,0,0,0));
+        var scene=workspace.controller().document().withPuppets(List.of(new StageplayDocument.PuppetTrack(actor,true,0,commands)))
+                .withCamera(List.of(new StageplayDocument.CameraKey(0,0,0,1,StageplayDocument.Interpolation.HOLD,
+                        new StageplayDocument.CameraFollow(List.of(actor),12,8,4,.2,0,0))));
+        Path saved=root.resolve("live.stageplay"); StageplayStore.write(saved,scene);
+        assertEquals(scene,StageplayStore.read(saved));
+        var rows=new StageplayChromeShell(new EditorChromeHost()).cueRows(StageplayStore.read(saved));
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("MOVE_TO") && r.detail().contains("Layout #179 + 16.00, 0.00") && r.detail().contains("timeout 120")));
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("WAIT") && r.detail().contains("ON_OBJECT") && r.detail().contains("Layout #179")));
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("FLY_TO") && r.detail().contains("200.00, 80.00 / 50%")));
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("HOVER") && r.detail().contains("30 frames")));
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("RELEASE") && r.detail().equals("Release native controls")));
+        assertTrue(rows.stream().anyMatch(r -> r.track().equals("Camera") && r.detail().equals("Follow " + actor)));
+    }
+
+    @Test
+    void liveInspectorUsesObservedSharedRingsDamageAndSupport() {
+        String status=StageplayChromeShell.liveActorStatus(new StageplayTimeline.LiveActor(
+                "tails",0,-3,true,false,true,179,"FLIGHT",1,24,2,5,"AVAILABLE"));
+        assertTrue(status.contains("Shared rings: 0 (-3)"));
+        assertTrue(status.contains("Hurt"));
+        assertTrue(status.contains("FLIGHT / 1 / 24 ticks"));
+        assertTrue(status.contains("Riding layout #179"));
+        assertTrue(status.contains("Target: AVAILABLE"));
+    }
+
+    private static void choose(StageplayWorkspace workspace,int row) {
+        var input=new InputHandler();
+        for(int i=0;i<row;i++) {
+            input.handleKeyEvent(GLFW_KEY_DOWN,GLFW_PRESS); input.refreshLogicalSnapshot(); workspace.menu().update(input);
+            input.handleKeyEvent(GLFW_KEY_DOWN,GLFW_RELEASE); input.refreshLogicalSnapshot(); workspace.menu().update(input);
+        }
+        input.handleKeyEvent(GLFW_KEY_ENTER,GLFW_PRESS); input.refreshLogicalSnapshot(); workspace.menu().update(input);
     }
 
     private static StageplayWorkspace workspace() {

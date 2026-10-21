@@ -38,19 +38,52 @@ in OpenGGF.
 
 ## Stageplay
 
-With a level open, press **F4** or choose **File → Stageplay workspace**. Add an actor,
-move the playhead, and choose **Set / edit key at playhead** to author movement or a
-pose. The **Direct** menu also exposes camera keys, shake/quake effects, scene changes,
+With a level open, press **F4** or choose **File → Stageplay workspace**. New actors use
+**Puppet** mode: native character physics and floor snapping. Set the initial world centre near the floor;
+snapping checks the native feet sensors up to 128 pixels below. Move the playhead and
+choose **Move / jump / stop** or press **K**. A move specifies a destination and urgency
+as a fraction of native maximum speed; the character tries to reach it through actual
+acceleration and collision. Jump uses the native jump and a chosen button hold. Stop
+brakes. The inspector shows actual position and moving, arrived or blocked state.
+The **Direct** menu also exposes camera keys, shake/quake effects, scene changes,
 dialogue, captions and audio cues. Property
 forms use the engine's keyboard, mouse and controller controls; choose a field, edit
 it, then use the form's final action to apply the change.
 
+Choose **LIVE** in **Scene and set** (or an individual scene change) for native level
+objects, rings, hazards and independently directed characters in one world. The
+**Direct native actions** menu adds waits, rolling, crouching and looking up. S3K Tails
+can fly toward a destination and hover; S3K Knuckles can glide. Release ends an ability
+through its native controls. Movement can follow a placed object by its layout index,
+expected object ID/subtype and local offset. Waits observe actual arrival, support,
+landing, hurt, recovery or ring collection, with a finite timeout. The inspector shows
+shared rings, hurt, ability state, supporting placement and target status; the timeline
+retains those instructions and camera follow targets.
+
+LIVE uses the set's own game for every Puppet, a native height of 224 pixels and fixed
+1x zoom. Width can be 320–1920. Configure the original ROM file for each referenced
+game. Preview runs the native world separately from the open level, including repeatable
+seeking and native effects. Actors must remain within the native object activation
+window around the camera; author routes and jumps explicitly. This is not a pathfinder.
+Camera keys can follow one actor or a group, with dead zones, look-ahead, smoothing and
+offsets. Set **follow** to comma-separated actor IDs in the camera-key form. Pan,
+shake and transitions remain available; Q/E zoom is for terrain-only shots.
+
 **Space** plays or pauses; **Left / Right** steps a frame (**Shift** steps 60 frames).
-**K** opens the selected actor's key at the playhead. **Ctrl+Z / Ctrl+Y** undo and redo;
+**K** opens the selected actor's Puppet actions or Poser key at the playhead. **Ctrl+Z / Ctrl+Y** undo and redo;
 **Ctrl+S** saves and **Ctrl+Shift+S** chooses a new path. **F1** lists every Stageplay
-command. The **Record actor** button records WASD movement as a baked visual
-performance; **Space** or **Stop** finishes the take. Recorded direction does not run
-native character physics.
+command. For Puppet actors, **Record actor** captures physics instructions: **A/D** directs movement,
+release or **S** brakes, and **W** triggers a native jump. **Space** or **Stop** finishes
+the take; one take is one undo step. Repeated preview reads and seeking use deterministic
+physics replay, without advancing the live level.
+
+In **Actor properties**, disable **Start on floor** for an airborne physical start,
+or select **POSER** for deliberate poses or coordinate choreography. **Poser** mode retains
+the position, animation and frame key editor and WASD position recording. Changing performance
+mode shows an undoable conversion: Puppet retains shot placements and visibility;
+Poser removes Puppet commands. Puppet placement resets only at shot boundaries;
+interior keys control visibility. Existing version-one through version-three scenes
+keep their existing Poser behavior when opened.
 
 Press **C** for camera direction. **WASD / arrows** pan, **Q / E** step integer zoom around the film
 centre (hold to repeat), and **Shift** pans faster. **K** captures the framing as a camera key; **R**
@@ -67,8 +100,9 @@ preserved, but can shimmer during movement and is best replaced with integer fra
 relative `.ogfproject`. Choose a cut, black/white fade or left/right wipe. Transitions
 are centred on the switch frame and cannot overlap. Inserting or moving a change adds
 incoming actor and camera keys together; position those keys for the new shot. Removing
-a change keeps its keys. Both editors save version-three `.stageplay` documents and
-can open existing version-one and version-two scenes.
+a change keeps its keys; physical actors normalize former placement keys to visibility
+keys. Both editors save version-five `.stageplay` documents and can open versions one
+through four, preserving their existing world mode.
 
 **Direct → Dialogue lines** creates named speech panels. Choose a cast member or an
 explicit offscreen speaker, then edit the text, interval and panel position. Actor
@@ -99,8 +133,8 @@ projects under the scene folder. Save As preserves relative asset paths and refu
 to move the scene away from assets still referenced by its undo or redo history. **File → Export film** uses the engine's shared exporter.
 **F4** returns to level editing and keeps the scene and its undo history available.
 
-The initial scene workflow is linear and uses load-state scenery; dynamic level events,
-water and live stock objects are not reproduced by the staged set preview. Editor panel
+The **TERRAIN_ONLY** world mode uses load-state scenery without live stock objects or
+zone events. **LIVE** advances the production world as described above. Editor panel
 positions and command-filter text are not saved into the scene.
 
 ## Requirements
