@@ -22,6 +22,28 @@ import static org.lwjgl.glfw.GLFW.*;
 /** Desktop input and commands use the same authoring objects as the built-in HUD. */
 class TestStageplayChrome {
     @Test
+    void desktopObjectCastAndClearSavePortableTracks(@TempDir Path root) throws Exception {
+        var workspace = workspace(); workspace.activate();
+        var queue = new ArrayDeque<Runnable>();
+        var frame = new StageplayChromeShell.Frame(workspace, queue::addLast, 0, 0, 320, 224, 1);
+        frame.invoke(StageplayWorkspace.Action.OBJECTS);
+        assertFalse(workspace.menu().isOpen()); queue.removeFirst().run(); choose(workspace, 0);
+        workspace.menu().setValue("name", "Directed prop"); workspace.menu().setValue("object", "86");
+        workspace.menu().setValue("mode", "POSE"); workspace.menu().submit();
+        assertNull(workspace.menu().error());
+        frame.seek(30); frame.invoke(StageplayWorkspace.Action.OBJECTS);
+        while (!queue.isEmpty()) queue.removeFirst().run(); choose(workspace, 4);
+        assertNull(workspace.menu().error());
+        var path = root.resolve("objects.stageplay"); workspace.saveTo(path);
+        var reopened = StageplayStore.read(path);
+        assertEquals(workspace.controller().document(), reopened);
+        assertEquals(StageplayDocument.ObjectMode.POSE, reopened.objectActors().getFirst().keys().getFirst().mode());
+        assertEquals(-1, reopened.objectActors().getFirst().layoutIndex());
+        assertEquals(StageplayDocument.WorldCommandKind.CLEAR_OBJECTS, reopened.worldCommands().getFirst().kind());
+        assertEquals(30, reopened.worldCommands().getFirst().frame());
+    }
+
+    @Test
     void workspaceSwitchAndSeekingAreQueuedAndOwnTheirTransitionTicks() throws Exception {
         var workspace = workspace();
         var chrome = chrome(workspace);

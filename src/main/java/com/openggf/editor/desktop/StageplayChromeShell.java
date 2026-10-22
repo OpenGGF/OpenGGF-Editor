@@ -119,7 +119,7 @@ final class StageplayChromeShell {
             if (ImGui.beginMenu("Direct")) {
                 try {
                     for (Action action : List.of(Action.ADD_ACTOR, Action.EDIT_ACTOR, Action.DELETE_ACTOR,
-                            Action.SET_KEY, Action.PUPPET_ACTIONS, Action.DELETE_KEY, Action.CAMERA_MODE, Action.SET_CAMERA_KEY, Action.CAMERA_KEY,
+                            Action.SET_KEY, Action.PUPPET_ACTIONS, Action.OBJECTS, Action.DELETE_KEY, Action.CAMERA_MODE, Action.SET_CAMERA_KEY, Action.CAMERA_KEY,
                             Action.RECORD_CAMERA, Action.CAMERA_EFFECTS, Action.SCENE_CHANGES, Action.CAPTION, Action.DIALOGUE, Action.DIALOGUE_TYPERS, Action.DIALOGUE_SKINS, Action.AUDIO, Action.RECORD))
                         menuItem(frame, action, "");
                 } finally { ImGui.endMenu(); }
@@ -214,6 +214,7 @@ final class StageplayChromeShell {
             ImGui.textDisabled(worldLabel(frame.workspace));
             ImGui.separator();
             if (ImGui.button("Add actor", -1, 0)) frame.invoke(Action.ADD_ACTOR);
+            if (ImGui.button("ROM object cast / clear", -1, 0)) frame.invoke(Action.OBJECTS);
             var actors = frame.workspace.controller().document().actors();
             if (actors.isEmpty()) ImGui.textWrapped("Cast a character, place its centre near the floor, then direct a destination or jump with K.");
             for (var actor : actors) {

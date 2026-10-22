@@ -109,8 +109,20 @@ relative `.ogfproject`. Choose a cut, black/white fade or left/right wipe. Trans
 are centred on the switch frame and cannot overlap. Inserting or moving a change adds
 incoming actor and camera keys together; position those keys for the new shot. Removing
 a change keeps its keys; physical actors normalize former placement keys to visibility
-keys. Both editors save version-six `.stageplay` documents and can open versions one
-through five, preserving their existing world mode.
+keys. Both editors save version-seven `.stageplay` documents and can open versions one
+through six, preserving their existing world mode.
+
+**Direct → ROM object cast / clear** lists the native registry and loaded placements.
+Add a native object or released animal, or select an existing placement by its portable
+layout index, object ID and subtype. **Free** runs its real native routine; arena-bound
+bosses show **Free: native arena position, anchor ignored** with the owning routine.
+Free actors require their native game, zone and act. **Puppet** moves a visual graph
+without running its AI, and **Pose** holds authored mapping frames. Child parts follow
+their captured parent relationships. Pure ROM animation tables may play; state-machine
+appearance remains held or authored, with exclusions shown in the inspector. The form
+also exposes per-part frames, visual movement commands, individual removal and timed
+**Clear badniks / Clear objects** commands. The same controls and document data are
+available in the built-in editor.
 
 **Direct → Dialogue lines** creates named speech panels. Choose a cast member or an
 explicit offscreen speaker, then edit the text, interval and panel position. Actor

@@ -168,6 +168,16 @@ class TestStageplayChromePictures {
                 renderMenu(menuRenderer,workspace,1600,900); capture("physics-goal-form",1600,900);
                 workspace.menu().close();
                 assertEquals(GL_NO_ERROR, glGetError());
+
+                workspace.controller().replace(StageplayDocument.empty("s2",0,1,0,0,320,224));
+                workspace.invoke(StageplayWorkspace.Action.OBJECTS);
+                renderMenu(menuRenderer,workspace,1600,900); capture("object-cast-commands",1600,900);
+                choose(workspace,0);
+                workspace.menu().setValue("name","EHZ boss"); workspace.menu().setValue("object","86");
+                workspace.menu().submit(); assertNull(workspace.menu().error());
+                renderMenu(menuRenderer,workspace,1600,900); capture("object-arena-restriction",1600,900);
+                choose(workspace,1); choose(workspace,0);
+                renderMenu(menuRenderer,workspace,1600,900); capture("object-mode-key",1600,900);
             }
         }
     }
