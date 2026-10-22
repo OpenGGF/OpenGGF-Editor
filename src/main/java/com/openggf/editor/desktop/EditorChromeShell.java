@@ -890,9 +890,9 @@ public final class EditorChromeShell implements AutoCloseable {
                 int current = field.decode(spawn.subtype());
                 ImGui.pushID(field.id());
                 try {
-                    if (field.kind() == com.openggf.editor.properties.ObjectPropertySchema.Kind.BOOLEAN) {
+                    if (field.kind() == com.openggf.level.metadata.ObjectPropertySchema.Kind.BOOLEAN) {
                         if (ImGui.checkbox(field.label(), current != 0)) edits.accept(() -> controller.setSelectedObjectProperty(field.id(), current == 0 ? 1 : 0));
-                    } else if (field.kind() == com.openggf.editor.properties.ObjectPropertySchema.Kind.ENUM) {
+                    } else if (field.kind() == com.openggf.level.metadata.ObjectPropertySchema.Kind.ENUM) {
                         if (ImGui.beginCombo(field.label(), field.display(spawn.subtype()))) {
                             try {
                                 for (var choice : field.choices().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey()).toList()) {
