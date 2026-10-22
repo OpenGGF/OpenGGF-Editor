@@ -162,14 +162,13 @@ final class StageplayChromeShell {
                 if (frame.workspace.recording()) frame.queue.accept(frame.workspace::stop);
                 else frame.invoke(frame.workspace.cameraMode() ? Action.RECORD_CAMERA : Action.RECORD);
             }
-            if (ImGui.isItemHovered()) ImGui.setTooltip("One take is one undo. Puppet: A/D move, W jump, release/S brake. Poser: WASD choreography. Camera: WASD/arrows pan."
-                    + (fixedZoom(frame.workspace) ? " Compatibility LIVE framing stays at 1x." : " Q/E zoom."));
+            if (ImGui.isItemHovered()) ImGui.setTooltip("One take is one undo. Puppet: A/D move, W jump, release/S brake. Poser: WASD choreography. Camera: WASD/arrows pan. Q/E zoom.");
             ImGui.sameLine();
             ImGui.beginDisabled(frame.workspace.recording());
             if (ImGui.button(frame.workspace.cameraMode() ? "Camera mode ON  C" : "Direct camera  C")) frame.invoke(Action.CAMERA_MODE);
             ImGui.endDisabled();
             ImGui.textDisabled(frame.workspace.cameraMode()
-                    ? "CAMERA: WASD / arrows pan | " + (fixedZoom(frame.workspace) ? "Compatibility LIVE: 1x" : "Q / E integer zoom") + " | K capture key | R record | C exit"
+                    ? "CAMERA: WASD / arrows pan | Q / E zoom | K capture key | R record | C exit"
                     : frame.workspace.controller().document().name() + "   |   C camera direction   |   F1 all commands");
         }
         ImGui.end();
@@ -251,10 +250,7 @@ final class StageplayChromeShell {
                 ImGui.textColored(EditorChromeTheme.SELECTION, "CAMERA DIRECTION");
                 ImGui.text("Position: " + coordinate(camera.x()) + ", " + coordinate(camera.y()));
                 ImGui.text("Zoom: " + coordinate(camera.zoom()));
-                if (!live(frame.workspace) && camera.zoom()!=Math.rint(camera.zoom())) ImGui.textWrapped("Compatibility scenery uses held fractional zoom. Integer framing avoids shimmer.");
-                ImGui.textWrapped(live(frame.workspace)
-                        ? "WASD / arrows pan. Q / E zoom. Shift moves faster. K captures framing; edit a camera key to follow one actor or frame a group."
-                        : "WASD / arrows pan. Q / E step integer zoom around the film centre. Hold to repeat. Shift moves faster. K captures framing; zoom cuts at keys.");
+                ImGui.textWrapped("WASD / arrows pan. Q / E zoom around the film centre. Shift moves faster. K captures framing; camera keys animate pans and zoom with their easing. Edit a key to follow one actor or frame a group.");
                 if (ImGui.button("Capture camera key  K", -1, 0)) frame.invoke(Action.SET_CAMERA_KEY);
                 if (ImGui.button("Edit / remove camera key", -1, 0)) frame.invoke(Action.CAMERA_KEY);
                 if (ImGui.button("Record camera take  R", -1, 0)) frame.invoke(Action.RECORD_CAMERA);
@@ -273,9 +269,7 @@ final class StageplayChromeShell {
                         .ifPresent(state -> ImGui.textWrapped(liveActorStatus(state)));
                 if (physical) {
                     ImGui.textColored(EditorChromeTheme.SELECTION, "PUPPET / NATIVE PHYSICS");
-                    ImGui.textWrapped(live(frame.workspace)
-                            ? "Direct movement, jumps and native abilities. Target a placed object, or wait for contact, arrival or recovery. Goals can be blocked or time out."
-                            : "Move sets a destination and urgency. Jump uses native physics. Goals are attempts; terrain can block arrival.");
+                    ImGui.textWrapped("Direct movement, jumps and native abilities. Target a placed object, or wait for contact, arrival or recovery. Goals can be blocked or time out.");
                     ImGui.textWrapped("Placement applies at shot boundaries. Actor properties can disable floor snapping or choose Poser choreography.");
                 } else {
                     ImGui.textColored(EditorChromeTheme.SELECTION, "POSER / POSITION AND POSE");
@@ -288,7 +282,7 @@ final class StageplayChromeShell {
                     ImGui.text("Transition: " + key.interpolation());
                 }
                 ImGui.spacing();
-                if (ImGui.button(physical ? (live(frame.workspace) ? "Direct native actions  K" : "Move / jump / stop  K") : "Set / edit key at playhead", -1, 0)) frame.invoke(Action.SET_KEY);
+                if (ImGui.button(physical ? "Direct native actions  K" : "Set / edit key at playhead", -1, 0)) frame.invoke(Action.SET_KEY);
                 if (ImGui.button(physical ? "Delete action at playhead" : "Delete key at playhead", -1, 0)) frame.invoke(Action.DELETE_KEY);
                 if (ImGui.button("Actor properties", -1, 0)) frame.invoke(Action.EDIT_ACTOR);
                 if (ImGui.button("Remove actor", -1, 0)) frame.invoke(Action.DELETE_ACTOR);
@@ -305,25 +299,8 @@ final class StageplayChromeShell {
 
     private static String coordinate(double value) { return String.format(Locale.ROOT, "%.2f", value); }
 
-    private static boolean live(StageplayWorkspace workspace) {
-        return com.openggf.stageplay.StageplayWorldPolicies.usesNativeWorld(
-                StageplayTimeline.sample(workspace.controller().document(), workspace.controller().frame())
-                        .set().worldPolicy());
-    }
-
-    private static boolean fixedZoom(StageplayWorkspace workspace) {
-        return StageplayTimeline.sample(workspace.controller().document(), workspace.controller().frame())
-                .set().worldPolicy() == StageplayDocument.WorldPolicy.LEGACY_LIVE;
-    }
-
     static String worldLabel(StageplayWorkspace workspace) {
-        var policy = StageplayTimeline.sample(workspace.controller().document(), workspace.controller().frame()).set().worldPolicy();
-        return switch (policy) {
-            case LIVE -> "Native world / objects and rings";
-            case TERRAIN_ONLY -> "Native world / initially cleared objects and rings";
-            case LEGACY_LIVE -> "Compatibility / original live world";
-            case LEGACY_TERRAIN_ONLY -> "Compatibility / detached terrain";
-        };
+        return "Native world / objects and rings";
     }
 
     static String liveActorStatus(StageplayTimeline.LiveActor actor) {

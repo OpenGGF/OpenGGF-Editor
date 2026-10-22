@@ -76,10 +76,10 @@ class TestStageplayChromePictures {
                 Path output = Path.of("target","stageplay-desktop").toAbsolutePath(); Files.createDirectories(output);
                 Path source = output.resolve("screenplay-source.json");
                 Files.writeString(source, """
-                        {"version":5,"name":"Two-way take","width":320,"height":224,
+                        {"version":6,"name":"Two-way take","width":320,"height":224,
                          "cast":[{"id":"hero","name":"Sonic","gameId":"s2","character":"sonic","puppet":false}],
                          "shots":[{"id":"opening","durationFrames":120,
-                         "set":{"gameId":"s2","zone":0,"act":0,"worldPolicy":"TERRAIN_ONLY"},
+                         "set":{"gameId":"s2","zone":0,"act":0,"worldPolicy":"LIVE"},
                          "camera":[{"frame":0,"x":0,"y":500}],"actors":{"hero":[
                          {"frame":0,"x":128,"y":648,"animation":5},{"frame":30,"x":128,"y":648,"animation":5},
                          {"frame":90,"x":256,"y":648,"animation":5},{"frame":119,"x":256,"y":648,"animation":5}]},
@@ -126,7 +126,7 @@ class TestStageplayChromePictures {
         try (var boot=new HeadlessGameBoot(1600,900,320,224,320,224)) {
             boot.setBootToTitle(true); boot.boot(rom,0,0);
             try (var renderer=new EditorProjectMenuRenderer()) {
-                for (var policy : List.of(StageplayDocument.WorldPolicy.LIVE,StageplayDocument.WorldPolicy.TERRAIN_ONLY)) {
+                for (var policy : List.of(StageplayDocument.WorldPolicy.LIVE)) {
                     var scene=StageplayDocument.empty("s2",0,0,0,500,320,224)
                             .withSet(new StageplayDocument.SetSource("s2",0,0,"","",policy));
                     var workspace=new StageplayWorkspace(() -> scene);
@@ -150,6 +150,7 @@ class TestStageplayChromePictures {
         try (var boot = new HeadlessGameBoot(1600, 900, 320, 224, 320, 224)) {
             boot.setBootToTitle(true);
             boot.boot(Path.of(rom), 0, 0);
+            GameServices.configuration().setSessionOverride(com.openggf.configuration.SonicConfiguration.SONIC_2_ROM, rom);
             try (var library = new SceneRomLibrary(GameServices.module(), GameServices.rom().getRom(), RomManager.getInstance());
                  var resources = new StageplayResources(library, false);
                  var surface = new SceneSurface();
@@ -158,7 +159,7 @@ class TestStageplayChromePictures {
                 int[] start = GameServices.module().getZoneRegistry().getStartPosition(0, 0);
                 double x = Math.max(0, start[0] - 80), y = Math.max(0, start[1] - 140);
                 var scene = StageplayDocument.empty("s2", 0, 0, x, y, 384, 216)
-                        .withSet(new StageplayDocument.SetSource("s2",0,0,"","",StageplayDocument.WorldPolicy.LEGACY_TERRAIN_ONLY)).withName("The next adventure")
+                        .withSet(new StageplayDocument.SetSource("s2",0,0,"","",StageplayDocument.WorldPolicy.LIVE)).withName("The next adventure")
                         .withActors(List.of(
                                 new StageplayDocument.Actor("hero", "Sonic", "s2", "sonic", List.of(key(0, x + 80, start[1], -1), key(120, x + 160, start[1], 1),key(240,x+80,start[1],-1))),
                                 new StageplayDocument.Actor("friend", "Tails", "s2", "tails", List.of(key(0, x + 220, start[1], -1),key(240,x+220,start[1],-1)))))
@@ -199,7 +200,9 @@ class TestStageplayChromePictures {
                     assertTrue(java.util.Arrays.stream(sprite.image().pixels()).anyMatch(pixel -> (pixel >>> 24) != 0),
                             "The pictured cast must resolve visible ROM artwork: " + actor.actorId() + " at frame " + frame);
                 }
-                surface.record(scene.width(),scene.height(), canvas -> renderer.draw(scene, StageplayTimeline.sample(scene, 60), canvas));
+                var preview = workspace.previewFrame();
+                assertNotNull(preview.world(), workspace.status());
+                surface.record(scene.width(),scene.height(), canvas -> renderer.draw(scene, preview, canvas));
                 assertTrue(chrome.setActive(true));
                 for (int i = 0; i < 4; i++) render(chrome, surface,scene,1600,900);
                 capture("workspace",1600,900);

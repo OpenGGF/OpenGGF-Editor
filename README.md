@@ -68,30 +68,29 @@ dialogue, captions and audio cues. Property
 forms use the engine's keyboard, mouse and controller controls; choose a field, edit
 it, then use the form's final action to apply the change.
 
-Choose **LIVE** in **Scene and set** (or an individual scene change) for native level
-objects, rings, hazards and independently directed characters in one world. The
+Every shot uses one native world for level objects, rings, hazards and
+independently directed characters. The
 **Direct native actions** menu adds waits, rolling, crouching and looking up. S3K Tails
-can fly toward a destination and hover; S3K Knuckles can glide. Release ends an ability
-through its native controls. Movement can follow a placed object by its layout index,
+can fly toward a destination and hover; S3K Knuckles can glide. Release lets go of
+the ability button and brakes horizontally. Tails keeps native flight momentum;
+allow descent and landing time. Movement can follow a placed object by its layout index,
 expected object ID/subtype and local offset. Waits observe actual arrival, support,
 landing, hurt, recovery or ring collection, with a finite timeout. The inspector shows
 shared rings, hurt, ability state, supporting placement and target status; the timeline
 retains those instructions and camera follow targets.
 
-Current scenes use the same native-world owner for **LIVE** and **TERRAIN_ONLY**;
-the latter clears initial objects and rings. Native performers use supplied-game
-movement and ROM art over shared terrain, including saved editor sets. Film
-dimensions and zoom work in both choices; completed-world resampling keeps dialogue
-and captions separate. The source picture is bounded to 4096 pixels per side and
-8 MiPixels; extreme framing fails explicitly. Logical-ROM image windows and
-composites are transported to isolated preview/export workers without joined ROM
-files. Versions one through five retain their original visible compatibility
-policies until a shot is explicitly upgraded.
+For a terrain-only shot, add **Clear objects** at the shot entry. Rings have a
+separate clear command. Every shot supports the same supplied-game movement,
+ROM art, saved editor sets, team sizes, bindings, activation windows, film sizes
+and zoom. Completed-world resampling keeps dialogue and captions separate. The
+source picture is bounded to 4096 pixels per side and 8 MiPixels; extreme framing
+fails explicitly. Logical-ROM image windows and composites travel to isolated
+preview/export workers without joined ROM files. Formats are unpublished: only
+the current version-seven document and version-six screenplay are accepted.
 
 Camera keys can follow one actor or a group, with dead zones, look-ahead, smoothing
 and offsets. Set **follow** to comma-separated actor IDs in the camera-key form.
-Pan, shake, transitions and Q/E zoom are available in current native shots.
-Compatibility LIVE shots retain their original 1x framing. Native object lifetime
+Pan, shake, transitions and Q/E zoom are available in every shot. Native object lifetime
 and slot limits still apply; the bounded route helper emits existing movement
 commands and verifies its candidate.
 
@@ -108,8 +107,7 @@ or select **POSER** for deliberate poses or coordinate choreography. **Poser** m
 the position, animation and frame key editor and WASD position recording. Changing performance
 mode shows an undoable conversion: Puppet retains shot placements and visibility;
 Poser removes Puppet commands. Puppet placement resets only at shot boundaries;
-interior keys control visibility. Existing version-one through version-three scenes
-keep their existing Poser behavior when opened.
+interior keys control visibility.
 
 Press **C** for camera direction. **WASD / arrows** pan, **Q / E** step integer zoom around the film
 centre (hold to repeat), and **Shift** pans faster. **K** captures the framing as a camera key; **R**
@@ -117,11 +115,11 @@ records a camera take with the same controls, committed as one undo step. **Spac
 finishes recording. Framing remains a preview until captured; seeking discards unkeyed
 framing. Numeric camera properties and key removal remain available in **Direct →
 Camera keys**. Shake/quake effects have their own interval, amplitudes, frequency and
-seed, so they layer over pan and framing without changing camera keys. Current native
-scenes animate position and zoom with HOLD / LINEAR / SMOOTH easing and accept
+seed, so they layer over pan and framing without changing camera keys. Camera keys
+animate position and zoom with HOLD / LINEAR / SMOOTH easing and accept
 fractional zoom (0.05x–64x); camera properties also offer 1x–4x presets. Fractional sampling
-filters the completed world picture while dialogue and captions stay crisp. Compatibility
-terrain scenes retain held zoom and their previous rendering; legacy LIVE stays 1x.
+filters the completed world picture while dialogue and captions stay crisp. Centred
+zoom keys preserve their framing centre, including fractional camera origins.
 Current background parallax/deformation follows the directed camera using frozen native
 effect phase. Separated performers activate independent native-sized regions sharing
 the native object slot budget. Clear unnecessary objects or split the shot if it fills.
@@ -131,19 +129,21 @@ relative `.ogfproject`. Choose a cut, black/white fade or left/right wipe. Trans
 are centred on the switch frame and cannot overlap. Inserting or moving a change adds
 incoming actor and camera keys together; position those keys for the new shot. Removing
 a change keeps its keys; physical actors normalize former placement keys to visibility
-keys. Both editors save version-seven `.stageplay` documents and can open versions one
-through six, preserving their existing world mode.
+keys. Both editors use the current version-seven `.stageplay` document directly.
 
 **Direct → ROM object cast / clear** lists the native registry and loaded placements.
 Add a native object or released animal, or select an existing placement by its portable
-layout index, object ID and subtype. **Free** runs its real native routine; arena-bound
+game, zone, act, layout index, object ID and subtype. **Free** runs its real native routine; arena-bound
 bosses show **Free: native arena position, anchor ignored** with the owning routine.
 Free roles require their authored source game, zone and act to match the current set.
 A globally admitted boss still uses its native arena coordinates when that source
 context is elsewhere; the tools do not relocate it. **Puppet** moves a visual graph
 without running its AI, and **Pose** holds authored mapping frames. Child parts follow
 their captured parent relationships. Pure ROM animation tables may play; state-machine
-appearance remains held or authored, with exclusions shown in the inspector. The form
+appearance remains held or authored, with exclusions shown in the inspector. Native
+timer-owned bird flap cycles animate in directed modes; walking frames tied to
+vertical velocity retain the held fallback. Directing or removing a holder releases
+the players it acquired through its native player-control cleanup. The form
 also exposes per-part frames, visual movement commands, individual removal and timed
 **Clear badniks / Clear objects** commands. The same controls and document data are
 available in the built-in editor.

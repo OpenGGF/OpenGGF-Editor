@@ -298,7 +298,7 @@ class TestStageplayChrome {
 
     @Test
     void nativeContentsPoliciesExposeTheSameFramingAndSaveContract(@TempDir Path root) throws Exception {
-        for (var policy : List.of(StageplayDocument.WorldPolicy.LIVE, StageplayDocument.WorldPolicy.TERRAIN_ONLY)) {
+        for (var policy : List.of(StageplayDocument.WorldPolicy.LIVE)) {
             var document = StageplayDocument.empty("s2", 0, 0, 0, 500, 384, 216)
                     .withSet(new StageplayDocument.SetSource("s2", 0, 0, "", "", policy));
             var workspace = new StageplayWorkspace(() -> document); workspace.activate();
