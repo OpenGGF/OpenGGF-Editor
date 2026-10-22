@@ -60,14 +60,21 @@ landing, hurt, recovery or ring collection, with a finite timeout. The inspector
 shared rings, hurt, ability state, supporting placement and target status; the timeline
 retains those instructions and camera follow targets.
 
-LIVE uses the set's own game for every Puppet, a native height of 224 pixels and fixed
-1x zoom. Width can be 320–1920. Configure the original ROM file for each referenced
-game. Preview runs the native world separately from the open level, including repeatable
-seeking and native effects. Actors must remain within the native object activation
-window around the camera; author routes and jumps explicitly. This is not a pathfinder.
-Camera keys can follow one actor or a group, with dead zones, look-ahead, smoothing and
-offsets. Set **follow** to comma-separated actor IDs in the camera-key form. Pan,
-shake and transitions remain available; Q/E zoom is for terrain-only shots.
+Current scenes use the same native-world owner for **LIVE** and **TERRAIN_ONLY**;
+the latter clears initial objects and rings. Native performers use supplied-game
+movement and ROM art over shared terrain, including saved editor sets. Film
+dimensions and zoom work in both choices; completed-world resampling keeps dialogue
+and captions separate. The source picture is bounded to 4096 pixels per side and
+8 MiPixels; extreme framing fails explicitly. Logical-ROM image windows and
+composites are transported to isolated preview/export workers without joined ROM
+files. Versions one through five retain their original visible compatibility
+policies until a shot is explicitly upgraded.
+
+Camera keys can follow one actor or a group, with dead zones, look-ahead, smoothing
+and offsets. Set **follow** to comma-separated actor IDs in the camera-key form.
+Pan, shake, transitions and Q/E zoom are available in current native shots.
+Compatibility LIVE shots retain their original 1x framing. Native activation bounds
+and explicit route/jump authoring still apply; this phase does not add pathfinding.
 
 **Space** plays or pauses; **Left / Right** steps a frame (**Shift** steps 60 frames).
 **K** opens the selected actor's Puppet actions or Poser key at the playhead. **Ctrl+Z / Ctrl+Y** undo and redo;
@@ -92,17 +99,18 @@ finishes recording. Framing remains a preview until captured; seeking discards u
 framing. Numeric camera properties and key removal remain available in **Direct →
 Camera keys**. Shake/quake effects have their own interval, amplitudes, frequency and
 seed, so they layer over pan and framing without changing camera keys. Pans interpolate;
-zoom stays fixed until the next camera key and changes as a cut. New framing uses integer
-zoom (1x–64x); camera properties also offer 1x–4x presets. Imported fractional zoom is
-preserved, but can shimmer during movement and is best replaced with integer framing.
+zoom stays fixed until the next camera key and changes as a cut. New native scenes accept
+fractional zoom (1x–64x); camera properties also offer 1x–4x presets. Fractional sampling
+filters the completed world picture while dialogue and captions stay crisp. Compatibility
+terrain scenes retain their previous integer framing and fractional rendering behavior.
 
 **Scene changes / transitions** adds, edits or deletes a switch to another ROM set or
 relative `.ogfproject`. Choose a cut, black/white fade or left/right wipe. Transitions
 are centred on the switch frame and cannot overlap. Inserting or moving a change adds
 incoming actor and camera keys together; position those keys for the new shot. Removing
 a change keeps its keys; physical actors normalize former placement keys to visibility
-keys. Both editors save version-five `.stageplay` documents and can open versions one
-through four, preserving their existing world mode.
+keys. Both editors save version-six `.stageplay` documents and can open versions one
+through five, preserving their existing world mode.
 
 **Direct → Dialogue lines** creates named speech panels. Choose a cast member or an
 explicit offscreen speaker, then edit the text, interval and panel position. Actor

@@ -220,6 +220,23 @@ class TestStageplayChrome {
     }
 
     @Test
+    void nativeContentsPoliciesExposeTheSameFramingAndSaveContract(@TempDir Path root) throws Exception {
+        for (var policy : List.of(StageplayDocument.WorldPolicy.LIVE, StageplayDocument.WorldPolicy.TERRAIN_ONLY)) {
+            var document = StageplayDocument.empty("s2", 0, 0, 0, 500, 384, 216)
+                    .withSet(new StageplayDocument.SetSource("s2", 0, 0, "", "", policy));
+            var workspace = new StageplayWorkspace(() -> document); workspace.activate();
+            workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY); choose(workspace, 0);
+            workspace.menu().setValue("zoom", "1.5"); workspace.menu().submit();
+            assertNull(workspace.menu().error(), policy.name());
+            assertEquals(1.5, workspace.controller().document().camera().getFirst().zoom());
+            assertEquals(216, workspace.controller().document().height());
+            assertTrue(StageplayChromeShell.worldLabel(workspace).startsWith("Native world"));
+            var path = root.resolve(policy.name() + ".stageplay"); workspace.saveTo(path);
+            assertEquals(workspace.controller().document(), com.openggf.stageplay.StageplayStore.read(path));
+        }
+    }
+
+    @Test
     void liveDirectionRoundTripsTargetsWaitsAbilitiesAndFollowThroughSharedForms(@TempDir Path root) throws Exception {
         var document = StageplayDocument.empty("s3k",0,0,0,0,320,224)
                 .withSet(new StageplayDocument.SetSource("s3k",0,0,"","",StageplayDocument.WorldPolicy.LIVE));

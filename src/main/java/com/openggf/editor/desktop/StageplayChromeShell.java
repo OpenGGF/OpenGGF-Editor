@@ -161,13 +161,13 @@ final class StageplayChromeShell {
                 else frame.invoke(frame.workspace.cameraMode() ? Action.RECORD_CAMERA : Action.RECORD);
             }
             if (ImGui.isItemHovered()) ImGui.setTooltip("One take is one undo. Puppet: A/D move, W jump, release/S brake. Poser: WASD choreography. Camera: WASD/arrows pan."
-                    + (live(frame.workspace) ? " Live world keeps zoom at 1x." : " Q/E zoom."));
+                    + (fixedZoom(frame.workspace) ? " Compatibility LIVE framing stays at 1x." : " Q/E zoom."));
             ImGui.sameLine();
             ImGui.beginDisabled(frame.workspace.recording());
             if (ImGui.button(frame.workspace.cameraMode() ? "Camera mode ON  C" : "Direct camera  C")) frame.invoke(Action.CAMERA_MODE);
             ImGui.endDisabled();
             ImGui.textDisabled(frame.workspace.cameraMode()
-                    ? "CAMERA: WASD / arrows pan | " + (live(frame.workspace) ? "Live world: 1x" : "Q / E integer zoom") + " | K capture key | R record | C exit"
+                    ? "CAMERA: WASD / arrows pan | " + (fixedZoom(frame.workspace) ? "Compatibility LIVE: 1x" : "Q / E integer zoom") + " | K capture key | R record | C exit"
                     : frame.workspace.controller().document().name() + "   |   C camera direction   |   F1 all commands");
         }
         ImGui.end();
@@ -211,7 +211,7 @@ final class StageplayChromeShell {
     private void cast(Frame frame) {
         if (ImGui.begin(CAST)) {
             ImGui.textDisabled("ACTORS");
-            ImGui.textDisabled(live(frame.workspace) ? "Live world / native objects and rings" : "Terrain only / staged scenery");
+            ImGui.textDisabled(worldLabel(frame.workspace));
             ImGui.separator();
             if (ImGui.button("Add actor", -1, 0)) frame.invoke(Action.ADD_ACTOR);
             var actors = frame.workspace.controller().document().actors();
@@ -248,9 +248,9 @@ final class StageplayChromeShell {
                 ImGui.textColored(EditorChromeTheme.SELECTION, "CAMERA DIRECTION");
                 ImGui.text("Position: " + coordinate(camera.x()) + ", " + coordinate(camera.y()));
                 ImGui.text("Zoom: " + coordinate(camera.zoom()));
-                if (camera.zoom()!=Math.rint(camera.zoom())) ImGui.textWrapped("Imported fractional zoom: use Q/E or capture integer framing to avoid shimmer.");
+                if (!live(frame.workspace) && camera.zoom()!=Math.rint(camera.zoom())) ImGui.textWrapped("Compatibility scenery uses held fractional zoom. Integer framing avoids shimmer.");
                 ImGui.textWrapped(live(frame.workspace)
-                        ? "WASD / arrows pan. Shift moves faster. K captures framing. Live world uses 1x zoom; edit a camera key to follow one actor or frame a group."
+                        ? "WASD / arrows pan. Q / E zoom. Shift moves faster. K captures framing; edit a camera key to follow one actor or frame a group."
                         : "WASD / arrows pan. Q / E step integer zoom around the film centre. Hold to repeat. Shift moves faster. K captures framing; zoom cuts at keys.");
                 if (ImGui.button("Capture camera key  K", -1, 0)) frame.invoke(Action.SET_CAMERA_KEY);
                 if (ImGui.button("Edit / remove camera key", -1, 0)) frame.invoke(Action.CAMERA_KEY);
@@ -304,7 +304,22 @@ final class StageplayChromeShell {
 
     private static boolean live(StageplayWorkspace workspace) {
         return StageplayTimeline.sample(workspace.controller().document(), workspace.controller().frame())
-                .set().worldPolicy() == StageplayDocument.WorldPolicy.LIVE;
+                .set().worldPolicy().usesNativeWorld();
+    }
+
+    private static boolean fixedZoom(StageplayWorkspace workspace) {
+        return StageplayTimeline.sample(workspace.controller().document(), workspace.controller().frame())
+                .set().worldPolicy() == StageplayDocument.WorldPolicy.LEGACY_LIVE;
+    }
+
+    static String worldLabel(StageplayWorkspace workspace) {
+        var policy = StageplayTimeline.sample(workspace.controller().document(), workspace.controller().frame()).set().worldPolicy();
+        return switch (policy) {
+            case LIVE -> "Native world / objects and rings";
+            case TERRAIN_ONLY -> "Native world / initially cleared objects and rings";
+            case LEGACY_LIVE -> "Compatibility / original live world";
+            case LEGACY_TERRAIN_ONLY -> "Compatibility / detached terrain";
+        };
     }
 
     static String liveActorStatus(StageplayTimeline.LiveActor actor) {

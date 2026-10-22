@@ -55,7 +55,8 @@ class TestStageplayChromePictures {
                  var chrome = new ImGuiEditorChrome()) {
                 int[] start = GameServices.module().getZoneRegistry().getStartPosition(0, 0);
                 double x = Math.max(0, start[0] - 80), y = Math.max(0, start[1] - 140);
-                var scene = StageplayDocument.empty("s2", 0, 0, x, y, 384, 216).withName("The next adventure")
+                var scene = StageplayDocument.empty("s2", 0, 0, x, y, 384, 216)
+                        .withSet(new StageplayDocument.SetSource("s2",0,0,"","",StageplayDocument.WorldPolicy.LEGACY_TERRAIN_ONLY)).withName("The next adventure")
                         .withActors(List.of(
                                 new StageplayDocument.Actor("hero", "Sonic", "s2", "sonic", List.of(key(0, x + 80, start[1], -1), key(120, x + 160, start[1], 1),key(240,x+80,start[1],-1))),
                                 new StageplayDocument.Actor("friend", "Tails", "s2", "tails", List.of(key(0, x + 220, start[1], -1),key(240,x+220,start[1],-1)))))
