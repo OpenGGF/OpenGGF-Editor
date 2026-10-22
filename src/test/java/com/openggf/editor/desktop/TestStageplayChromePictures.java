@@ -39,6 +39,59 @@ import static org.lwjgl.opengl.GL11.*;
  */
 class TestStageplayChromePictures {
     @Test
+    void captureScreenplayImportRefineAndExportForms() throws Exception {
+        assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
+        assertEquals("surfaceless-egl",System.getProperty("openggf.headless.gl"));
+        Path rom = Path.of(System.getProperty("sonic2.rom.path"));
+        assertTrue(rom.isAbsolute() && Files.isRegularFile(rom));
+        try (var boot = new HeadlessGameBoot(1600,900,320,224,320,224)) {
+            boot.setBootToTitle(true); boot.boot(rom,0,0);
+            try (var renderer = new EditorProjectMenuRenderer()) {
+                Path output = Path.of("target","stageplay-desktop").toAbsolutePath(); Files.createDirectories(output);
+                Path source = output.resolve("screenplay-source.json");
+                Files.writeString(source, """
+                        {"version":5,"name":"Two-way take","width":320,"height":224,
+                         "cast":[{"id":"hero","name":"Sonic","gameId":"s2","character":"sonic","puppet":false}],
+                         "shots":[{"id":"opening","durationFrames":120,
+                         "set":{"gameId":"s2","zone":0,"act":0,"worldPolicy":"TERRAIN_ONLY"},
+                         "camera":[{"frame":0,"x":0,"y":500}],"actors":{"hero":[
+                         {"frame":0,"x":128,"y":648,"animation":5},{"frame":30,"x":128,"y":648,"animation":5},
+                         {"frame":90,"x":256,"y":648,"animation":5},{"frame":119,"x":256,"y":648,"animation":5}]},
+                         "audio":[{"frame":0,"kind":"ROM_MUSIC","gameId":"s2","soundId":129}]}]}
+                        """);
+                var workspace = workspaceForScreenplay(); workspace.activate();
+                var queue = new java.util.ArrayDeque<Runnable>();
+                var frame = new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
+                frame.invoke(StageplayWorkspace.Action.IMPORT_SCREENPLAY); queue.removeFirst().run();
+                workspace.menu().setValue("path","target/stageplay-desktop/screenplay-source.json");
+                renderMenu(renderer,workspace,1600,900); capture("screenplay-import-form",1600,900);
+                workspace.menu().setValue("path",source.toString()); workspace.menu().submit();
+                assertNull(workspace.menu().error()); assertNull(workspace.path()); assertTrue(workspace.controller().dirty());
+                frame.select("hero"); frame.seek(90); frame.invoke(StageplayWorkspace.Action.SET_KEY);
+                while (!queue.isEmpty()) queue.removeFirst().run();
+                workspace.menu().setValue("x","240"); workspace.menu().submit(); assertNull(workspace.menu().error());
+                frame.seek(119); frame.invoke(StageplayWorkspace.Action.SET_KEY);
+                while (!queue.isEmpty()) queue.removeFirst().run();
+                workspace.menu().setValue("x","240"); workspace.menu().submit(); assertNull(workspace.menu().error());
+                var refined = workspace.controller().document();
+                assertEquals(240,refined.actors().getFirst().keys().stream().filter(k -> k.frame()==90).findFirst().orElseThrow().x());
+                Path exported = output.resolve("ui-refined.screenplay.json"); Files.deleteIfExists(exported);
+                frame.invoke(StageplayWorkspace.Action.EXPORT_SCREENPLAY); queue.removeFirst().run();
+                workspace.menu().setValue("path","target/stageplay-desktop/ui-refined.screenplay.json");
+                renderMenu(renderer,workspace,1600,900); capture("screenplay-export-form",1600,900);
+                workspace.menu().setValue("path",exported.toString()); workspace.menu().submit(); assertNull(workspace.menu().error());
+                assertEquals(refined,com.openggf.tools.StageplayScriptCompiler.compile(Files.readAllBytes(exported)));
+                assertTrue(workspace.controller().dirty()); assertTrue(workspace.controller().canUndo());
+                workspace.saveTo(output.resolve("ui-refined.stageplay"));
+            }
+        }
+    }
+
+    private static StageplayWorkspace workspaceForScreenplay() {
+        return new StageplayWorkspace(() -> StageplayDocument.empty("s2",0,0,0,500,320,224));
+    }
+
+    @Test
     void captureAnimatedCameraFormForBothNativeContentsPolicies() throws Exception {
         assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
         assertEquals("surfaceless-egl",System.getProperty("openggf.headless.gl"));

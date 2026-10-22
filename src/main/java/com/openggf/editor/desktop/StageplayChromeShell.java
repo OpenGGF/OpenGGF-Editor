@@ -99,6 +99,8 @@ final class StageplayChromeShell {
                 try {
                     menuItem(frame, Action.NEW, "");
                     menuItem(frame, Action.OPEN, "");
+                    menuItem(frame, Action.IMPORT_SCREENPLAY, "");
+                    menuItem(frame, Action.EXPORT_SCREENPLAY, "");
                     ImGui.separator();
                     menuItem(frame, Action.SAVE, "Ctrl+S");
                     menuItem(frame, Action.SAVE_AS, "Ctrl+Shift+S");

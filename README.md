@@ -38,6 +38,14 @@ in OpenGGF.
 
 ## Stageplay
 
+The File menu offers **Import screenplay** and **Export screenplay**, using the same
+shot-local version-six format as the in-engine editor and terminal tool. Import
+creates an unsaved canonical scene; refine it, save `.stageplay`, then export and
+recompile without losing supported data. Export preserves save state, undo history
+and pending authored takes. Choose a new output filename; relative assets require
+the existing scene directory. Original screenplay formatting and shot labels are
+not reconstructed.
+
 With a level open, press **F4** or choose **File → Stageplay workspace**. New actors use
 **Puppet** mode: native character physics and floor snapping. Set the initial world centre near the floor;
 snapping checks the native feet sensors up to 128 pixels below. Move the playhead and

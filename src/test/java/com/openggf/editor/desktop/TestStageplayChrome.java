@@ -22,6 +22,36 @@ import static org.lwjgl.glfw.GLFW.*;
 /** Desktop input and commands use the same authoring objects as the built-in HUD. */
 class TestStageplayChrome {
     @Test
+    void screenplayImportAndExportUseQueuedSharedFormsAndPreserveUndo(@TempDir Path root) throws Exception {
+        Path source = root.resolve("source.json");
+        java.nio.file.Files.write(source,com.openggf.tools.StageplayScriptDecompiler.decompile(
+                StageplayDocument.empty("s2",0,0,0,500,320,224).withName("Imported")));
+        var workspace = workspace(); workspace.activate();
+        var queue = new ArrayDeque<Runnable>();
+        var frame = new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
+        frame.invoke(StageplayWorkspace.Action.IMPORT_SCREENPLAY);
+        assertFalse(workspace.menu().isOpen()); queue.removeFirst().run();
+        assertEquals("Import screenplay",workspace.menu().title());
+        workspace.menu().setValue("path",source.toString()); workspace.menu().submit();
+        assertNull(workspace.menu().error()); assertNull(workspace.path());
+        assertTrue(workspace.controller().dirty()); assertEquals(root,workspace.assetRoot());
+        var imported = workspace.controller().document();
+        frame.invoke(StageplayWorkspace.Action.SCENE); queue.removeFirst().run();
+        workspace.menu().setValue("name","Desktop refinement"); workspace.menu().submit();
+        var refined = workspace.controller().document();
+        Path output = root.resolve("refined.json");
+        frame.invoke(StageplayWorkspace.Action.EXPORT_SCREENPLAY); queue.removeFirst().run();
+        assertEquals("Export screenplay",workspace.menu().title());
+        workspace.menu().setValue("path",output.toString()); workspace.menu().submit();
+        assertNull(workspace.menu().error());
+        assertEquals(refined,com.openggf.tools.StageplayScriptCompiler.compile(java.nio.file.Files.readAllBytes(output)));
+        assertTrue(workspace.controller().dirty()); assertNull(workspace.path());
+        frame.invoke(StageplayWorkspace.Action.UNDO); queue.removeFirst().run();
+        assertEquals(imported,workspace.controller().document()); assertTrue(workspace.controller().dirty());
+        assertEquals(imported,com.openggf.tools.StageplayScriptCompiler.compile(java.nio.file.Files.readAllBytes(source)));
+    }
+
+    @Test
     void desktopObjectCastAndClearSavePortableTracks(@TempDir Path root) throws Exception {
         var workspace = workspace(); workspace.activate();
         var queue = new ArrayDeque<Runnable>();
