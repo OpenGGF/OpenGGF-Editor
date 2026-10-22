@@ -39,6 +39,29 @@ import static org.lwjgl.opengl.GL11.*;
  */
 class TestStageplayChromePictures {
     @Test
+    void captureAnimatedCameraFormForBothNativeContentsPolicies() throws Exception {
+        assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
+        assertEquals("surfaceless-egl",System.getProperty("openggf.headless.gl"));
+        Path rom=Path.of(System.getProperty("sonic2.rom.path"));
+        assertTrue(rom.isAbsolute() && Files.isRegularFile(rom));
+        try (var boot=new HeadlessGameBoot(1600,900,320,224,320,224)) {
+            boot.setBootToTitle(true); boot.boot(rom,0,0);
+            try (var renderer=new EditorProjectMenuRenderer()) {
+                for (var policy : List.of(StageplayDocument.WorldPolicy.LIVE,StageplayDocument.WorldPolicy.TERRAIN_ONLY)) {
+                    var scene=StageplayDocument.empty("s2",0,0,0,500,320,224)
+                            .withSet(new StageplayDocument.SetSource("s2",0,0,"","",policy));
+                    var workspace=new StageplayWorkspace(() -> scene);
+                    workspace.activate(); workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY); choose(workspace,0);
+                    workspace.menu().setValue("zoom","1.5");
+                    workspace.menu().setValue("interpolation","SMOOTH");
+                    renderMenu(renderer,workspace,1600,900);
+                    capture("camera-animated-"+policy.name().toLowerCase(java.util.Locale.ROOT),1600,900);
+                }
+            }
+        }
+    }
+
+    @Test
     void captureActualDesktopStageplayWithRomSetAndActors() throws Exception {
         assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
         assertEquals("surfaceless-egl", System.getProperty("openggf.headless.gl"), "No display fallback is allowed");

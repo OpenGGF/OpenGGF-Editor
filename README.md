@@ -98,11 +98,14 @@ records a camera take with the same controls, committed as one undo step. **Spac
 finishes recording. Framing remains a preview until captured; seeking discards unkeyed
 framing. Numeric camera properties and key removal remain available in **Direct →
 Camera keys**. Shake/quake effects have their own interval, amplitudes, frequency and
-seed, so they layer over pan and framing without changing camera keys. Pans interpolate;
-zoom stays fixed until the next camera key and changes as a cut. New native scenes accept
-fractional zoom (1x–64x); camera properties also offer 1x–4x presets. Fractional sampling
+seed, so they layer over pan and framing without changing camera keys. Current native
+scenes animate position and zoom with HOLD / LINEAR / SMOOTH easing and accept
+fractional zoom (0.05x–64x); camera properties also offer 1x–4x presets. Fractional sampling
 filters the completed world picture while dialogue and captions stay crisp. Compatibility
-terrain scenes retain their previous integer framing and fractional rendering behavior.
+terrain scenes retain held zoom and their previous rendering; legacy LIVE stays 1x.
+Current background parallax/deformation follows the directed camera using frozen native
+effect phase. Separated performers activate independent native-sized regions sharing
+the native object slot budget. Clear unnecessary objects or split the shot if it fills.
 
 **Scene changes / transitions** adds, edits or deletes a switch to another ROM set or
 relative `.ogfproject`. Choose a cut, black/white fade or left/right wipe. Transitions
@@ -116,7 +119,9 @@ through six, preserving their existing world mode.
 Add a native object or released animal, or select an existing placement by its portable
 layout index, object ID and subtype. **Free** runs its real native routine; arena-bound
 bosses show **Free: native arena position, anchor ignored** with the owning routine.
-Free actors require their native game, zone and act. **Puppet** moves a visual graph
+Free roles require their authored source game, zone and act to match the current set.
+A globally admitted boss still uses its native arena coordinates when that source
+context is elsewhere; the tools do not relocate it. **Puppet** moves a visual graph
 without running its AI, and **Pose** holds authored mapping frames. Child parts follow
 their captured parent relationships. Pure ROM animation tables may play; state-machine
 appearance remains held or authored, with exclusions shown in the inspector. The form

@@ -248,11 +248,17 @@ class TestStageplayChrome {
                     .withSet(new StageplayDocument.SetSource("s2", 0, 0, "", "", policy));
             var workspace = new StageplayWorkspace(() -> document); workspace.activate();
             workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY); choose(workspace, 0);
-            workspace.menu().setValue("zoom", "1.5"); workspace.menu().submit();
+            workspace.menu().setValue("zoom", "1.5");
+            workspace.menu().setValue("interpolation", "SMOOTH"); workspace.menu().submit();
             assertNull(workspace.menu().error(), policy.name());
             assertEquals(1.5, workspace.controller().document().camera().getFirst().zoom());
             assertEquals(216, workspace.controller().document().height());
             assertTrue(StageplayChromeShell.worldLabel(workspace).startsWith("Native world"));
+            workspace.seek(60); workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY); choose(workspace, 0);
+            workspace.menu().setValue("zoom", ".75"); workspace.menu().submit();
+            assertNull(workspace.menu().error(), policy.name());
+            assertEquals(1.125, com.openggf.stageplay.StageplayTimeline.sample(
+                    workspace.controller().document(), 30).camera().zoom());
             var path = root.resolve(policy.name() + ".stageplay"); workspace.saveTo(path);
             assertEquals(workspace.controller().document(), com.openggf.stageplay.StageplayStore.read(path));
         }
