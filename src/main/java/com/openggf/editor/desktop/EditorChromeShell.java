@@ -58,6 +58,7 @@ public final class EditorChromeShell implements AutoCloseable {
 
     private final EditorChromeHost host;
     private final EditorTileAtlas atlas = new EditorTileAtlas();
+    private final EditorTileAtlas ghostAtlas = new EditorTileAtlas();
     private final ImString filter = new ImString(32);
     private final ImString commandFilter = new ImString(64);
     private final float[] thumbnailSize = {64f};
@@ -343,8 +344,49 @@ public final class EditorChromeShell implements AutoCloseable {
             case BLOCK -> "World  /  Block " + hex(controller.selection().selectedBlock());
             case CHUNK -> "World  /  Block " + hex(controller.selection().selectedBlock())
                     + "  /  Chunk " + hex(controller.selection().selectedChunk());
-        } + "      " + frame.gameScale() + "x scale";
+        } + "      " + frame.gameScale() + "x display / " + controller.canvasView().zoom() + "x canvas";
         draw.addText(gx, gy + gh + 6, EditorChromeTheme.TEXT_DIM, caption);
+        drawRegionGhost(frame, draw);
+    }
+
+    private void drawRegionGhost(Frame frame, ImDrawList draw) {
+        var controller = frame.controller(); var level = controller.currentLevel();
+        var editor = com.openggf.game.session.SessionManager.getCurrentEditorMode();
+        if (level == null || controller.depth() != EditorHierarchyDepth.WORLD || editor == null) return;
+        int size = level.getBlockPixelSize();
+        float unit = frame.gameScale() * (float) controller.canvasView().zoom();
+        int cameraX = Short.toUnsignedInt(editor.getCamera().getXCopy()), cameraY = editor.getCamera().getYCopy();
+        var rect = controller.regionSelection();
+        draw.pushClipRect(frame.gameX(), frame.gameY(), frame.gameX() + frame.gameWidth(), frame.gameY() + frame.gameHeight());
+        try {
+            if (rect != null) {
+                float x = frame.gameX() + (rect.x() * size - cameraX) * unit, y = frame.gameY() + (rect.y() * size - cameraY) * unit;
+                draw.addRect(x, y, x + rect.width() * size * unit, y + rect.height() * size * unit, EditorChromeTheme.SELECTION);
+            }
+            if (!controller.isPastePreviewActive()) return;
+            try {
+                var ghost = controller.pastePreview(); rect = ghost.rectangle();
+                ghostAtlas.refresh(controller.clipboardLibrary(), 0);
+                float cell = size * unit;
+                for (int y = 0; y < rect.height(); y++) for (int x = 0; x < rect.width(); x++) {
+                    float px = frame.gameX() + ((rect.x() + x) * size - cameraX) * unit;
+                    float py = frame.gameY() + ((rect.y() + y) * size - cameraY) * unit;
+                    if (px > frame.gameX() + frame.gameWidth() || py > frame.gameY() + frame.gameHeight() || px + cell < frame.gameX() || py + cell < frame.gameY()) continue;
+                    var tile = ghostAtlas.cell(EditorTileAtlas.Kind.BLOCK, ghost.blocks().get(y * rect.width() + x));
+                    if (tile != null) draw.addImage(tile.texture(), px, py, px + cell, py + cell,
+                            tile.u0(), tile.v0(), tile.u1(), tile.v1(), 0x99FFFFFF);
+                    draw.addRect(px, py, px + cell, py + cell, EditorChromeTheme.SELECTION);
+                }
+                for (var object : ghost.objects()) {
+                    float x = frame.gameX() + (object.x() - cameraX) * unit, y = frame.gameY() + (object.y() - cameraY) * unit;
+                    draw.addRect(x - 5, y - 5, x + 5, y + 5, EditorChromeTheme.SELECTION);
+                }
+                for (var ring : ghost.rings()) {
+                    float x = frame.gameX() + (ring.x() - cameraX) * unit, y = frame.gameY() + (ring.y() - cameraY) * unit;
+                    draw.addCircle(x, y, 4, EditorChromeTheme.SELECTION);
+                }
+            } catch (IllegalArgumentException invalid) { draw.addText(frame.gameX() + 8, frame.gameY() + 8, EditorChromeTheme.SELECTION, "Invalid paste destination"); }
+        } finally { draw.popClipRect(); }
     }
 
     // ---------------------------------------------------------------- library
@@ -572,6 +614,17 @@ public final class EditorChromeShell implements AutoCloseable {
     }
 
     private void worldInspector(Frame frame, MutableLevel level) {
+        heading("Region / clipboard");
+        if (ImGui.button("Set corner / finish (F6)")) frame.dispatch().accept(Action.SELECT_REGION_CORNER);
+        ImGui.sameLine(); if (ImGui.button("Clear")) frame.dispatch().accept(Action.CLEAR_REGION);
+        if (ImGui.button("Copy")) frame.dispatch().accept(Action.COPY_REGION);
+        ImGui.sameLine(); if (ImGui.button("Cut")) frame.dispatch().accept(Action.CUT_REGION);
+        ImGui.sameLine(); if (ImGui.button("Paste preview")) frame.dispatch().accept(Action.PASTE_REGION);
+        if (ImGui.button("Delete region")) frame.dispatch().accept(Action.DELETE_REGION);
+        ImGui.sameLine(); if (ImGui.button("Fill rectangle")) frame.dispatch().accept(Action.FILL_REGION);
+        if (ImGui.button("Flood fill at cursor")) frame.dispatch().accept(Action.FLOOD_FILL);
+        ImGui.textDisabled("Shift+drag selects cells. Enter places; Esc cancels paste.");
+
         LevelEditorController controller = frame.controller();
         heading("Block brush");
         preview(EditorTileAtlas.Kind.BLOCK, controller.selectedBlockIndex(), 112);
@@ -953,5 +1006,6 @@ public final class EditorChromeShell implements AutoCloseable {
     @Override
     public void close() {
         atlas.close();
+        ghostAtlas.close();
     }
 }

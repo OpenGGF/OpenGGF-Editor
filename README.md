@@ -38,6 +38,22 @@ in OpenGGF.
   animations, cameras, captions, sound, music and voice through the same authoring
   commands used by the in-engine editor.
 
+## Level authoring controls
+
+Pick an object with right click, then edit its named fields in **Selected placement**.
+The inspector keeps **Raw subtype** for every object; each change is one undo step.
+
+**Shift+left drag** selects world cells. **F6** sets the first and opposite corners
+with the keyboard. The World inspector offers copy, cut, paste preview, delete,
+rectangle fill and flood fill; **Ctrl+C/X/V** are the clipboard shortcuts. Move the
+translucent terrain/spawn preview and **Enter** or click to paste; **Escape** cancels.
+The active layer's terrain is copied with objects/rings, preserving whole native
+ring groups. Paste rejects invalid/outside destinations before changing the level.
+
+Middle-drag pans, the mouse wheel zooms around the pointer, **Ctrl+arrows** pans,
+**Ctrl+=/-** zooms and **Ctrl+0** returns to native 1×. Navigation is independent
+of undo history and gameplay camera bounds. Zoom magnifies 1×–8×.
+
 ## Stageplay
 
 With a level open, press **F4** or choose **File → Stageplay workspace**. New actors use
@@ -188,8 +204,8 @@ the desktop editor on its class path.
   with offscreen rendering and simulated input.
 - **No saved dock layout.** `imgui.ini` is disabled, so panels return to their default
   layout on every start.
-- **The level-editing canvas is the engine's fixed camera view.** It is drawn at an
-  integer scale. Stageplay camera keys provide authored pan and zoom for scenes.
+- **Canvas zoom starts at native 1×.** Middle-drag pans independently; wheel zoom
+  magnifies the world 1×–8×. Zooming out to show a wider world remains unavailable.
 - **No native image.** The editor runs on the JVM. The engine's GraalVM build has not been
   adapted to include it.
 
