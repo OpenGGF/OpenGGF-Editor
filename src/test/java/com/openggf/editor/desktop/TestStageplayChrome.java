@@ -22,6 +22,31 @@ import static org.lwjgl.glfw.GLFW.*;
 /** Desktop input and commands use the same authoring objects as the built-in HUD. */
 class TestStageplayChrome {
     @Test
+    void routeHelperQueuesTheSharedRequestAndCancellationWithoutEditingTheScene() {
+        var request=new java.util.concurrent.atomic.AtomicReference<com.openggf.stageplay.route.StageplayRouteRequest>();
+        var cancelled=new java.util.concurrent.atomic.AtomicInteger();
+        var scene=StageplayDocument.empty("s2",0,0,0,500,320,224).withActors(List.of(
+                new StageplayDocument.Actor("hero","Sonic","s2","sonic",List.of(new StageplayDocument.ActorKey(0,128,648,0,-1,false,true,1,StageplayDocument.Interpolation.HOLD)))))
+                .withPuppets(List.of(new StageplayDocument.PuppetTrack("hero",true,0,List.of())));
+        var workspace=new StageplayWorkspace(new StageplayWorkspace.Host(){
+            public StageplayDocument initialDocument(){return scene;}
+            public void startRoute(StageplayDocument document,Path root,com.openggf.stageplay.route.StageplayRouteRequest value){request.set(value);}
+            public com.openggf.stageplay.editor.StageplayRouteJob.Update pollRoute(){return request.get()==null?null:
+                    new com.openggf.stageplay.editor.StageplayRouteJob.Update(1,com.openggf.stageplay.editor.StageplayRouteJob.Phase.PLANNING,"working",null);}
+            public void cancelRoute(){cancelled.incrementAndGet();}
+        });
+        workspace.activate();var queue=new ArrayDeque<Runnable>();
+        var frame=new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
+        frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);assertFalse(workspace.menu().isOpen());queue.removeFirst().run();
+        assertEquals("Route attempts (object AI off)",workspace.menu().title());
+        workspace.menu().setValue("x","240");workspace.menu().setValue("y","648");workspace.menu().setValue("frames","90");workspace.menu().submit();
+        assertNull(workspace.menu().error());assertEquals("hero",request.get().actorId());assertNull(request.get().footprint());
+        assertEquals(scene,workspace.controller().document());assertFalse(workspace.controller().canUndo());
+        int before=cancelled.get();frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);queue.removeFirst().run();choose(workspace,1);
+        assertTrue(cancelled.get()>before);assertEquals(scene,workspace.controller().document());
+    }
+
+    @Test
     void screenplayImportAndExportUseQueuedSharedFormsAndPreserveUndo(@TempDir Path root) throws Exception {
         Path source = root.resolve("source.json");
         java.nio.file.Files.write(source,com.openggf.tools.StageplayScriptDecompiler.decompile(

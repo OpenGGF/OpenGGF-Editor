@@ -39,6 +39,32 @@ import static org.lwjgl.opengl.GL11.*;
  */
 class TestStageplayChromePictures {
     @Test
+    void captureCollisionRouteAndVisualFootprintForms() throws Exception {
+        assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
+        assertEquals("surfaceless-egl",System.getProperty("openggf.headless.gl"));
+        Path rom=Path.of(System.getProperty("sonic2.rom.path"));assertTrue(rom.isAbsolute() && Files.isRegularFile(rom));
+        try (var boot=new HeadlessGameBoot(1600,900,320,224,320,224)) {
+            boot.setBootToTitle(true);boot.boot(rom,0,0);
+            try (var renderer=new EditorProjectMenuRenderer()) {
+                var scene=StageplayDocument.empty("s2",0,0,0,500,320,224).withActors(List.of(
+                        new StageplayDocument.Actor("hero","Sonic","s2","sonic",List.of(new StageplayDocument.ActorKey(0,128,648,0,-1,false,true,1,StageplayDocument.Interpolation.HOLD)))))
+                        .withPuppets(List.of(new StageplayDocument.PuppetTrack("hero",true,0,List.of())))
+                        .withObjectActors(List.of(new StageplayDocument.ObjectActor("prop","Walking prop","s2",0,0,65,0,-1,
+                                List.of(new StageplayDocument.ObjectKey(0,128,648,0,-1,false,true,StageplayDocument.Interpolation.HOLD,StageplayDocument.ObjectMode.PUPPET)),List.of())));
+                var workspace=new StageplayWorkspace(() -> scene);workspace.activate();workspace.selectActor("hero");
+                var queue=new java.util.ArrayDeque<Runnable>();var frame=new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
+                frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);queue.removeFirst().run();
+                workspace.menu().setValue("x","240");workspace.menu().setValue("y","648");
+                renderMenu(renderer,workspace,1600,900);capture("route-player-form",1600,900);
+                workspace.menu().close();frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);queue.removeFirst().run();workspace.menu().setValue("actor","prop");
+                workspace.menu().setValue("halfWidth","12");workspace.menu().setValue("height","24");workspace.menu().setValue("footOffset","12");
+                var input=new InputHandler();for(int i=0;i<12;i++)press(workspace,input,GLFW_KEY_DOWN);
+                renderMenu(renderer,workspace,1600,900);capture("route-object-footprint-form",1600,900);
+            }
+        }
+    }
+
+    @Test
     void captureScreenplayImportRefineAndExportForms() throws Exception {
         assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
         assertEquals("surfaceless-egl",System.getProperty("openggf.headless.gl"));

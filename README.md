@@ -53,6 +53,16 @@ choose **Move / jump / stop** or press **K**. A move specifies a destination and
 as a fraction of native maximum speed; the character tries to reach it through actual
 acceleration and collision. Jump uses the native jump and a chosen button hold. Stop
 brakes. The inspector shows actual position and moving, arrived or blocked state.
+Choose **Direct → Route helper** for bounded planning over the set's actual
+collision terrain. Players start at shot entry; objects can also start at an
+existing visible Puppet key after explicit Free initialization. Playable routes emit native movement/jump/stop intents
+and require fresh cold LIVE replay before **VERIFIED**. Object Puppet routes use
+explicit visual clearance and speed, remain AI-free, and report **VISUAL_TERRAIN**.
+Planning runs in its own cancellable worker; review diagnostics, then apply a
+matching result as one undo step. Changed scenes, ROMs or project assets invalidate
+it. Exhausted budgets or unsupported terrain report failure without teleporting
+actors or replacing the current preview.
+
 The **Direct** menu also exposes camera keys, shake/quake effects, scene changes,
 dialogue, captions and audio cues. Property
 forms use the engine's keyboard, mouse and controller controls; choose a field, edit
@@ -81,8 +91,9 @@ policies until a shot is explicitly upgraded.
 Camera keys can follow one actor or a group, with dead zones, look-ahead, smoothing
 and offsets. Set **follow** to comma-separated actor IDs in the camera-key form.
 Pan, shake, transitions and Q/E zoom are available in current native shots.
-Compatibility LIVE shots retain their original 1x framing. Native activation bounds
-and explicit route/jump authoring still apply; this phase does not add pathfinding.
+Compatibility LIVE shots retain their original 1x framing. Native object lifetime
+and slot limits still apply; the bounded route helper emits existing movement
+commands and verifies its candidate.
 
 **Space** plays or pauses; **Left / Right** steps a frame (**Shift** steps 60 frames).
 **K** opens the selected actor's Puppet actions or Poser key at the playhead. **Ctrl+Z / Ctrl+Y** undo and redo;
