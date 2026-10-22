@@ -68,6 +68,7 @@ public final class EditorChromeShell implements AutoCloseable {
     private boolean commandPaletteFocus;
     private boolean commandPaletteOpen;
     private int patternPaletteLine;
+    private int paletteEditLine = 1, paletteEditColor;
     private Area canvas = new Area(0, 0, 1, 1);
 
     public EditorChromeShell(EditorChromeHost host) {
@@ -585,6 +586,7 @@ public final class EditorChromeShell implements AutoCloseable {
                     case CHUNK -> chunkInspector(frame, level);
                 }
             }
+            paletteInspector(frame, level);
         }
         ImGui.end();
         ImGui.popStyleVar();
@@ -611,6 +613,45 @@ public final class EditorChromeShell implements AutoCloseable {
                     cell.u0(), cell.v0(), cell.u1(), cell.v1());
         }
         ImGui.dummy(size, size);
+    }
+
+    private void paletteInspector(Frame frame, MutableLevel level) {
+        if (!ImGui.collapsingHeader("Level palette / Genesis 9-bit")) return;
+        for (int line = 0; line < 4; line++) {
+            for (int color = 0; color < 16; color++) {
+                ImGui.pushID(line * 16 + color);
+                if (color > 0) ImGui.sameLine(0, 2);
+                var rgb = level.getPalette(line).getColor(color);
+                if (ImGui.colorButton("##color", rgb.rFloat(), rgb.gFloat(), rgb.bFloat(), 1, 0, 15, 18)) {
+                    paletteEditLine = line; paletteEditColor = color;
+                }
+                if (ImGui.isItemHovered()) ImGui.setTooltip("Line " + line + " / color " + color);
+                ImGui.popID();
+            }
+        }
+        var controller = frame.controller();
+        ImGui.text("Line " + paletteEditLine + " / color " + paletteEditColor);
+        if (!controller.isPaletteCellEditable(paletteEditLine, paletteEditColor)) {
+            ImGui.textDisabled("Host-owned palette cell"); return;
+        }
+        var rgb = level.getPalette(paletteEditLine).getColor(paletteEditColor);
+        int[] steps = {(Byte.toUnsignedInt(rgb.r) * 7 + 127) / 255, (Byte.toUnsignedInt(rgb.g) * 7 + 127) / 255,
+                (Byte.toUnsignedInt(rgb.b) * 7 + 127) / 255};
+        String[] names = {"Red", "Green", "Blue"};
+        for (int channel = 0; channel < 3; channel++) {
+            if (ImGui.beginCombo(names[channel], Integer.toString(com.openggf.editor.palette.EditorPaletteEditing.componentFromStep(steps[channel])))) {
+                try {
+                    for (int value = 0; value < 8; value++) {
+                        if (ImGui.selectable(Integer.toString(com.openggf.editor.palette.EditorPaletteEditing.componentFromStep(value)), steps[channel] == value)) {
+                            int[] edited = steps.clone(); edited[channel] = value;
+                            int line = paletteEditLine, color = paletteEditColor;
+                            edits.accept(() -> controller.editPaletteColor(line, color, edited[0], edited[1], edited[2]));
+                        }
+                    }
+                } finally { ImGui.endCombo(); }
+            }
+        }
+        ImGui.textDisabled("8 exact values per channel; each edit is undoable.");
     }
 
     private void worldInspector(Frame frame, MutableLevel level) {

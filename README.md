@@ -54,6 +54,12 @@ Middle-drag pans, the mouse wheel zooms around the pointer, **Ctrl+arrows** pans
 **Ctrl+=/-** zooms and **Ctrl+0** returns to native 1×. Navigation is independent
 of undo history and gameplay camera bounds. Zoom magnifies 1×–8×.
 
+Open **Level palette / Genesis 9-bit** in the inspector, choose a color and set RGB
+from the eight exact native values. Character/HUD-owned cells are locked. Color
+edits update preview textures and round-trip through the existing project/export
+formats. Background scroll source, water height and allowed teams await a versioned
+engine contract; the editor does not save settings that would disappear on export.
+
 ## Stageplay
 
 With a level open, press **F4** or choose **File → Stageplay workspace**. New actors use
