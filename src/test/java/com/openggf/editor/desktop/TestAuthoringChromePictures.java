@@ -8,12 +8,20 @@ import com.openggf.editor.EditorInputHandler;
 import com.openggf.editor.EditorSpawnEditMode;
 import com.openggf.editor.EditorWindowChrome;
 import com.openggf.editor.LevelEditorController;
+import com.openggf.editor.EditorCommand;
+import com.openggf.editor.project.EditorProjectDocument;
+import com.openggf.editor.project.EditorProjectMetadata;
+import com.openggf.editor.project.EditorProjectWorkspace;
+import com.openggf.editor.persistence.FullLevelExporter;
+import com.openggf.editor.render.EditorOverlayRenderer;
 import com.openggf.game.GameId;
+import com.openggf.game.GameModule;
 import com.openggf.game.GameServices;
 import com.openggf.game.LevelLoadMode;
 import com.openggf.game.session.EditorCursorState;
 import com.openggf.game.session.SessionManager;
 import com.openggf.level.LevelManager;
+import com.openggf.level.Level;
 import com.openggf.level.MutableLevel;
 import com.openggf.tools.HeadlessGameBoot;
 import imgui.ImGui;
@@ -60,8 +68,14 @@ class TestAuthoringChromePictures {
                             || GameServices.audio().getBackend() instanceof HeadlessSmpsAudioBackend,
                     "The capture must own a no-device audio backend");
             GameServices.level().loadZoneAndAct(0, 0, LevelLoadMode.PREVIEW_CAPTURE);
-            var level = MutableLevel.snapshot(GameServices.level().getCurrentLevel());
+            var library = MutableLevel.snapshot(GameServices.level().getCurrentLevel());
             var module = GameServices.module();
+            var metadata = new EditorProjectMetadata(GameId.S2, "Emerald Authoring Workshop", 0, 0,
+                    "offscreen-s2-evidence", Math.max(0, library.getMinX()), Math.max(0, library.getMinY()),
+                    library.getMinX(), library.getMaxX(), library.getMinY(), library.getMaxY(),
+                    new FullLevelExporter.ExportMusic.Stock(0x81), null);
+            var document = EditorProjectDocument.create(metadata, library);
+            var level = document.level();
             var monitor = level.getObjects().stream().filter(object -> object.objectId() == 0x26)
                     .findFirst().orElseThrow(() -> new AssertionError("EHZ1 must supply a native monitor placement"));
             var world = SessionManager.getCurrentWorldSession();
@@ -81,6 +95,28 @@ class TestAuthoringChromePictures {
             var controller = new LevelEditorController();
             controller.attachLevel(level);
             controller.configureSpawnEditing(module.createObjectRegistry(), module.getObjectPlacementEncoding());
+            var workspace = new EditorProjectWorkspace(new EditorProjectWorkspace.Host() {
+                @Override public GameModule selectGame(GameId game) { assertEquals(GameId.S2, game); return module; }
+                @Override public GameModule currentModule() { return module; }
+                @Override public Level loadLibrary(int zone, int act) { return library; }
+                @Override public String sourceFingerprint() { return "offscreen-s2-evidence"; }
+                @Override public EditorCursorState cursor() { return controller.worldCursor(); }
+                @Override public void finishPendingEdits() { controller.finishPendingEdits(); }
+                @Override public void showDocument(EditorProjectDocument value) { controller.attachLevel(value.level()); }
+                @Override public void playtest(EditorProjectDocument value, boolean fromCursor) { fail("No gameplay launch in UI capture"); }
+                @Override public void closeDocument() { fail("No project close in UI capture"); }
+                @Override public void menuClosed(EditorProjectDocument value) { }
+                @Override public void execute(EditorCommand command) { controller.executeCommand(command); }
+                @Override public void status(String message) { controller.setStatus(message); }
+            });
+            controller.setProjects(workspace);
+            workspace.openProject(document);
+            assertSame(document, workspace.document());
+            assertTrue(!workspace.backgroundOptions().isEmpty());
+            workspace.applySettings(document, document.metadata().settings()
+                    .withBackground(workspace.backgroundOptions().getFirst().source())
+                    .withWaterHeight(576)
+                    .withTeam(com.openggf.editor.project.EditorLevelTeams.choices().get(2).team()));
             controller.setPaletteRefresh(line -> graphics.cachePaletteTexture(level.getPalette(line), line));
             controller.setSpawnEditMode(EditorSpawnEditMode.OBJECTS);
             controller.setWorldCursor(new EditorCursorState(monitor.x(), monitor.y()));
@@ -112,9 +148,9 @@ class TestAuthoringChromePictures {
                     @Override public List<EditorCommandPalette.HostCommand> commands() { return List.of(); }
                 }, 1);
                 assertTrue(chrome.setActive(true));
-                for (int frame = 0; frame < 4; frame++) render(chrome);
+                for (int frame = 0; frame < 4; frame++) render(chrome, controller);
                 openPaletteSection(chrome);
-                for (int frame = 0; frame < 4; frame++) render(chrome);
+                for (int frame = 0; frame < 4; frame++) render(chrome, controller);
                 capture("object-inspector-palette");
 
                 controller.setSpawnEditMode(EditorSpawnEditMode.TILES);
@@ -130,11 +166,34 @@ class TestAuthoringChromePictures {
                 assertEquals(sourceX + 1, controller.pastePreview().rectangle().x());
                 assertEquals(1, controller.pastePreview().rectangle().width());
                 assertFalse(controller.pastePreview().blocks().isEmpty());
-                for (int frame = 0; frame < 4; frame++) render(chrome);
+                for (int frame = 0; frame < 4; frame++) render(chrome, controller);
                 assertEquals(destinationBefore, level.getMap().getValue(0, sourceX + 1, sourceY),
                         "Reviewing the translucent ghost must not paste it into the level");
                 capture("selection-ghost");
                 controller.cancelPastePreview();
+
+                // A minimal inspector context keeps the complete level-wide settings surface
+                // visible; these values belong to the real workspace/document contract.
+                controller.setSpawnEditMode(EditorSpawnEditMode.RINGS);
+                setInspectorHeader(chrome, PALETTE_HEADER, false);
+                for (int frame = 0; frame < 4; frame++) render(chrome, controller);
+                capture("settings-panel");
+
+                controller.setSpawnEditMode(EditorSpawnEditMode.OBJECTS);
+                controller.objectPalette().setObjectKey("openggf:camera-zone");
+                controller.setWorldCursor(new EditorCursorState(monitor.x() + 96, monitor.y() - 32));
+                controller.placeObjectSpawnAtCursor();
+                controller.setSelectedGizmoProperty("width", 160);
+                controller.setSelectedGizmoProperty("height", 96);
+                controller.setSelectedGizmoProperty("releaseAt", monitor.x() + 256);
+                controller.setSelectedGizmoProperty("releaseCondition", "CROSS_X");
+                editor.getCamera().setX((short) Math.max(0, monitor.x() - 32));
+                editor.getCamera().setY((short) Math.max(0, monitor.y() - 64));
+                editor.getCamera().captureRenderCopy();
+                setInspectorHeader(chrome, "Level settings", false);
+                for (int frame = 0; frame < 4; frame++) render(chrome, controller);
+                assertEquals("openggf:camera-zone", controller.selectedObjectSpawn().objectKey());
+                capture("camera-gizmo");
                 assertEquals(GL_NO_ERROR, glGetError());
             }
         }
@@ -142,6 +201,10 @@ class TestAuthoringChromePictures {
 
     /** Open the real header's native window state, without changing shell code or faking its controls. */
     private static void openPaletteSection(ImGuiEditorChrome chrome) throws Exception {
+        setInspectorHeader(chrome, PALETTE_HEADER, true);
+    }
+
+    private static void setInspectorHeader(ImGuiEditorChrome chrome, String label, boolean open) throws Exception {
         var field = ImGuiEditorChrome.class.getDeclaredField("host");
         field.setAccessible(true);
         var host = (EditorChromeHost) field.get(chrome);
@@ -149,14 +212,15 @@ class TestAuthoringChromePictures {
         try {
             ImGui.begin("Inspector");
             try {
-                int id = ImGui.getID(PALETTE_HEADER);
-                ImGui.getStateStorage().setInt(id, 1);
-                assertEquals(1, ImGui.getStateStorage().getInt(id));
+                int id = ImGui.getID(label);
+                ImGui.getStateStorage().setInt(id, open ? 1 : 0);
+                ImGui.setScrollY(0);
+                assertEquals(open ? 1 : 0, ImGui.getStateStorage().getInt(id));
             } finally { ImGui.end(); }
         } finally { host.endFrameAndRender(); }
     }
 
-    private static void render(ImGuiEditorChrome chrome) {
+    private static void render(ImGuiEditorChrome chrome, LevelEditorController controller) {
         chrome.update(new InputHandler());
         int[] viewport = chrome.gameViewport(WIDTH, HEIGHT, WIDTH, HEIGHT, GAME_WIDTH, GAME_HEIGHT);
         assertNotNull(viewport);
@@ -170,6 +234,7 @@ class TestAuthoringChromePictures {
         graphics.setProjectionWidth(GAME_WIDTH);
         SessionManager.getCurrentEditorMode().getLevelManager().drawWithRenderOptions(null,
                 new LevelManager.LevelRenderOptions(false, false, false, false, false, false, false));
+        new EditorOverlayRenderer(controller, graphics).renderWorldSpaceOverlay();
         var camera = SessionManager.getCurrentEditorMode().getCamera();
         graphics.flushWithCamera(camera.getXCopy(), camera.getYCopy(), (short) GAME_WIDTH, (short) GAME_HEIGHT);
         chrome.render(WIDTH, HEIGHT, WIDTH, HEIGHT);

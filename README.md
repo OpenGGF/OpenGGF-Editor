@@ -57,8 +57,13 @@ of undo history and gameplay camera bounds. Zoom magnifies 1×–8×.
 Open **Level palette / Genesis 9-bit** in the inspector, choose a color and set RGB
 from the eight exact native values. Character/HUD-owned cells are locked. Color
 edits update preview textures and round-trip through the existing project/export
-formats. Background scroll source, water height and allowed teams await a versioned
-engine contract; the editor does not save settings that would disappear on export.
+formats. **Level settings** offers provider-backed background scrolling, fixed water
+height and an allowed team; playtest applies them. Built-in `openggf:` camera/music
+zones, paired warps and blocking Stageplay triggers have typed inspector fields.
+**Campaign levels** orders saved projects and exports a playable mod JAR without
+Java. **Import art** opens project-contained PNG/sheet paths with a file browser;
+installation and optional palette changes form one undo step. Shared forms also
+work with the HUD controller keyboard.
 
 ## Stageplay
 

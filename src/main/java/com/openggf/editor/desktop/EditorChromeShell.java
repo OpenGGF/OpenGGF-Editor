@@ -586,6 +586,7 @@ public final class EditorChromeShell implements AutoCloseable {
                     case CHUNK -> chunkInspector(frame, level);
                 }
             }
+            levelSettings(frame);
             paletteInspector(frame, level);
         }
         ImGui.end();
@@ -613,6 +614,51 @@ public final class EditorChromeShell implements AutoCloseable {
                     cell.u0(), cell.v0(), cell.u1(), cell.v1());
         }
         ImGui.dummy(size, size);
+    }
+
+    private void levelSettings(Frame frame) {
+        var workspace = frame.controller().projects();
+        if (workspace == null || workspace.document() == null) return;
+        if (!ImGui.collapsingHeader("Level settings", imgui.flag.ImGuiTreeNodeFlags.DefaultOpen)) return;
+        var document = workspace.document();
+        var settings = document.metadata().settings();
+        String label = workspace.settingsRows().getFirst().value();
+        ImGui.textDisabled("Background / parallax");
+        ImGui.setNextItemWidth(-1);
+        if (ImGui.beginCombo("##background", label)) {
+            if (ImGui.selectable("Flat", settings.background() == null))
+                edits.accept(() -> workspace.applySettings(document, settings.withBackground(null)));
+            for (var option : workspace.backgroundOptions()) if (ImGui.selectable(option.label(), option.source().equals(settings.background())))
+                edits.accept(() -> workspace.applySettings(document, settings.withBackground(option.source())));
+            ImGui.endCombo();
+        }
+        if (workspace.supportsWater()) {
+            boolean enabled = settings.waterHeight() != null;
+            if (ImGui.checkbox("Water enabled", enabled))
+                edits.accept(() -> workspace.applySettings(document, settings.withWaterHeight(enabled ? null
+                        : Math.clamp(document.metadata().startY() + 128, (int) Short.MIN_VALUE, (int) Short.MAX_VALUE))));
+            if (enabled) {
+                ImInt height = new ImInt(settings.waterHeight());
+                ImGui.textDisabled("Water height (px)");
+                ImGui.setNextItemWidth(-1);
+                if (ImGui.inputInt("##waterHeight", height, 1, 16)) {
+                    int value = height.get();
+                    edits.accept(() -> workspace.applySettings(document, settings.withWaterHeight(value)));
+                }
+            }
+        }
+        ImGui.textDisabled("Allowed team");
+        ImGui.setNextItemWidth(-1);
+        if (ImGui.beginCombo("##allowedTeam", com.openggf.editor.project.EditorLevelTeams.label(settings.team()))) {
+            for (var option : workspace.teamChoices())
+                if (ImGui.selectable(option.label(), java.util.Objects.equals(option.team(), settings.team())))
+                    edits.accept(() -> workspace.applySettings(document, settings.withTeam(option.team())));
+            ImGui.endCombo();
+        }
+        if (ImGui.button("Title, start and bounds...")) edits.accept(workspace::properties);
+        if (ImGui.button("Campaign levels...")) edits.accept(workspace::campaign);
+        if (ImGui.button("Import art...")) edits.accept(workspace::importArtForm);
+        ImGui.textDisabled("Playtest applies the selected environment.");
     }
 
     private void paletteInspector(Frame frame, MutableLevel level) {
@@ -886,14 +932,17 @@ public final class EditorChromeShell implements AutoCloseable {
                 row("Position", spawn.x() + ", " + spawn.y());
                 ImGui.endTable();
             }
-            for (var field : controller.selectedObjectProperties().editableFields()) {
+            if (!controller.selectedGizmoFields().isEmpty()) gizmoInspector(controller, spawn);
+            else for (var field : controller.selectedObjectProperties().editableFields()) {
                 int current = field.decode(spawn.subtype());
                 ImGui.pushID(field.id());
                 try {
                     if (field.kind() == com.openggf.level.metadata.ObjectPropertySchema.Kind.BOOLEAN) {
                         if (ImGui.checkbox(field.label(), current != 0)) edits.accept(() -> controller.setSelectedObjectProperty(field.id(), current == 0 ? 1 : 0));
                     } else if (field.kind() == com.openggf.level.metadata.ObjectPropertySchema.Kind.ENUM) {
-                        if (ImGui.beginCombo(field.label(), field.display(spawn.subtype()))) {
+                        ImGui.textDisabled(field.label());
+                        ImGui.setNextItemWidth(-1);
+                        if (ImGui.beginCombo("##value", field.display(spawn.subtype()))) {
                             try {
                                 for (var choice : field.choices().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey()).toList()) {
                                     if (ImGui.selectable(choice.getValue(), current == choice.getKey())) {
@@ -905,7 +954,9 @@ public final class EditorChromeShell implements AutoCloseable {
                         }
                     } else {
                         var value = new imgui.type.ImInt(current);
-                        if (ImGui.inputInt(field.label(), value) && value.get() >= 0 && value.get() <= field.maximum()) {
+                        ImGui.textDisabled(field.label());
+                        ImGui.setNextItemWidth(-1);
+                        if (ImGui.inputInt("##value", value) && value.get() >= 0 && value.get() <= field.maximum()) {
                             int next = value.get();
                             edits.accept(() -> controller.setSelectedObjectProperty(field.id(), next));
                         }
@@ -919,6 +970,44 @@ public final class EditorChromeShell implements AutoCloseable {
             if (ImGui.button(EditorIcons.ERASER + "  Delete placement", -1, 0)) frame.dispatch().accept(Action.DELETE_SPAWN);
         }
         helpFooter("Click places the brush. Right-click selects an existing placement.");
+    }
+
+    private void gizmoInspector(LevelEditorController controller, ObjectSpawn spawn) {
+        for (var field : controller.selectedGizmoFields()) {
+            Object current = field.value(spawn.authoredProperties());
+            ImGui.pushID(field.key());
+            try {
+                switch (field.kind()) {
+                    case BOOL -> { if (ImGui.checkbox(field.label(), (Boolean)current))
+                        edits.accept(() -> controller.setSelectedGizmoProperty(field.key(), !(Boolean)current)); }
+                    case INT -> {
+                        var value = new imgui.type.ImInt((Integer)current);
+                        ImGui.textDisabled(field.label());
+                        ImGui.setNextItemWidth(-1);
+                        if (ImGui.inputInt("##value", value) && value.get() >= field.min() && value.get() <= field.max()) {
+                            int next = value.get(); edits.accept(() -> controller.setSelectedGizmoProperty(field.key(), next));
+                        }
+                    }
+                    case ENUM -> {
+                        ImGui.textDisabled(field.label());
+                        ImGui.setNextItemWidth(-1);
+                        if (ImGui.beginCombo("##value", (String)current)) {
+                            try { for (String choice : field.choices()) if (ImGui.selectable(choice, choice.equals(current)))
+                                edits.accept(() -> controller.setSelectedGizmoProperty(field.key(), choice)); }
+                            finally { ImGui.endCombo(); }
+                        }
+                    }
+                    case TEXT -> {
+                        ImGui.textDisabled(field.label()); ImGui.textWrapped((String)current);
+                        if (ImGui.button("Edit...")) edits.accept(() -> controller.openGizmoTextField(field));
+                    }
+                }
+            } finally { ImGui.popID(); }
+        }
+        if (spawn.authoredProperties() instanceof com.openggf.level.objects.authored.AuthoredObjectProperties.Warp)
+            ImGui.textWrapped("Place another Warp to create the exit. The lower placement ID is the one-way source.");
+        if (spawn.authoredProperties() instanceof com.openggf.level.objects.authored.AuthoredObjectProperties.StageplayTrigger)
+            ImGui.textWrapped("Stageplay uses the public blocking player. Up activates button triggers.");
     }
 
     private static void row(String label, String value) {
