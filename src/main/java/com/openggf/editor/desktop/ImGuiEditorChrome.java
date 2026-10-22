@@ -95,6 +95,7 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
                 if (engine.stageplay() != null && commands.stream().noneMatch(command -> command.label().toLowerCase(java.util.Locale.ROOT).contains("stageplay")))
                     commands.add(new EditorCommandPalette.HostCommand("Stageplay workspace (F4)",
                             () -> pending.addLast(engine.stageplay()::activate)));
+                shell.setEditDispatcher(pending::addLast);
                 canvas = shell.draw(new EditorChromeShell.Frame(engine.controller(),
                         action -> pending.addLast(() -> engine.dispatch(action)), List.copyOf(commands),
                         game[0], game[1], game[2], game[3], game[4]));

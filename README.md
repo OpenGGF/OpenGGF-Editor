@@ -26,7 +26,9 @@ in OpenGGF.
   - Block: an 8x8 composition grid (click to paint, right-click to pick), flips, solidity
     and height-map index.
   - Chunk: a 2x2 grid, palette lines and priority.
-  - Objects: stock object placement.
+  - Objects: stock object placement and selected-placement typed properties (spring
+    orientation/strength, monitor contents, Sonic 2 platform movement/shape/solidity).
+    Unsupported objects keep raw-byte editing. Each edit undoes independently.
 - **Toolbar:** mode, FG/BG layer, collision overlay and path, undo and redo, save,
   playtest from the cursor, and a clickable breadcrumb.
 - **Command palette:** every editor command, plus OpenGGF's project commands (new, open,

@@ -61,6 +61,8 @@ public final class EditorChromeShell implements AutoCloseable {
     private final ImString filter = new ImString(32);
     private final ImString commandFilter = new ImString(64);
     private final float[] thumbnailSize = {64f};
+    private java.util.function.Consumer<Runnable> edits = Runnable::run;
+    public void setEditDispatcher(java.util.function.Consumer<Runnable> dispatcher) { edits = java.util.Objects.requireNonNull(dispatcher); }
     private boolean layoutBuilt;
     private boolean commandPaletteFocus;
     private boolean commandPaletteOpen;
@@ -790,12 +792,32 @@ public final class EditorChromeShell implements AutoCloseable {
                 row("Position", spawn.x() + ", " + spawn.y());
                 ImGui.endTable();
             }
-            ImGui.alignTextToFramePadding();
-            ImGui.text(String.format("Subtype  $%02X", spawn.subtype()));
-            ImGui.sameLine();
-            if (ImGui.button(EditorIcons.MINUS + "##sub")) frame.dispatch().accept(Action.DECREMENT_SELECTED_SUBTYPE);
-            ImGui.sameLine(0, 4);
-            if (ImGui.button(EditorIcons.PLUS + "##sub")) frame.dispatch().accept(Action.INCREMENT_SELECTED_SUBTYPE);
+            for (var field : controller.selectedObjectProperties().editableFields()) {
+                int current = field.decode(spawn.subtype());
+                ImGui.pushID(field.id());
+                try {
+                    if (field.kind() == com.openggf.editor.properties.ObjectPropertySchema.Kind.BOOLEAN) {
+                        if (ImGui.checkbox(field.label(), current != 0)) edits.accept(() -> controller.setSelectedObjectProperty(field.id(), current == 0 ? 1 : 0));
+                    } else if (field.kind() == com.openggf.editor.properties.ObjectPropertySchema.Kind.ENUM) {
+                        if (ImGui.beginCombo(field.label(), field.display(spawn.subtype()))) {
+                            try {
+                                for (var choice : field.choices().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey()).toList()) {
+                                    if (ImGui.selectable(choice.getValue(), current == choice.getKey())) {
+                                        int value = choice.getKey();
+                                        edits.accept(() -> controller.setSelectedObjectProperty(field.id(), value));
+                                    }
+                                }
+                            } finally { ImGui.endCombo(); }
+                        }
+                    } else {
+                        var value = new imgui.type.ImInt(current);
+                        if (ImGui.inputInt(field.label(), value) && value.get() >= 0 && value.get() <= field.maximum()) {
+                            int next = value.get();
+                            edits.accept(() -> controller.setSelectedObjectProperty(field.id(), next));
+                        }
+                    }
+                } finally { ImGui.popID(); }
+            }
             if (ImGui.checkbox("Flip horizontal", (spawn.renderFlags() & 1) != 0)) controller.toggleSelectedSpawnFlag(1);
             if (ImGui.checkbox("Flip vertical", (spawn.renderFlags() & 2) != 0)) controller.toggleSelectedSpawnFlag(2);
             if (ImGui.checkbox("Respawn tracked  (R)", spawn.respawnTracked())) frame.dispatch().accept(Action.TOGGLE_SELECTED_RESPAWN);
