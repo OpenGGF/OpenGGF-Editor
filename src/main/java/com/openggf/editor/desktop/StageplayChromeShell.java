@@ -303,8 +303,9 @@ final class StageplayChromeShell {
     private static String coordinate(double value) { return String.format(Locale.ROOT, "%.2f", value); }
 
     private static boolean live(StageplayWorkspace workspace) {
-        return StageplayTimeline.sample(workspace.controller().document(), workspace.controller().frame())
-                .set().worldPolicy().usesNativeWorld();
+        return com.openggf.stageplay.StageplayWorldPolicies.usesNativeWorld(
+                StageplayTimeline.sample(workspace.controller().document(), workspace.controller().frame())
+                        .set().worldPolicy());
     }
 
     private static boolean fixedZoom(StageplayWorkspace workspace) {
