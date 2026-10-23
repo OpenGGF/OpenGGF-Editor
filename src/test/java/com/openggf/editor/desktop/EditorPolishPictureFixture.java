@@ -59,19 +59,19 @@ abstract class EditorPolishPictureFixture {
             assertTrue(GameServices.audio().getBackend() instanceof NullAudioBackend
                     || GameServices.audio().getBackend() instanceof HeadlessSmpsAudioBackend);
             var module = GameServices.module();
-            var level = MutableLevel.snapshot(com.openggf.level.LevelObjectArt.authoringLibrary(GameServices.level().getCurrentLevel()));
             int monitorId = game == GameId.S3K ? 1 : 0x26;
-            var monitor = level.getObjects().stream().filter(s -> s.objectId() == monitorId).findFirst().orElseThrow();
-            var world = SessionManager.getCurrentWorldSession(); world.setCurrentLevel(level);
-            var editor = SessionManager.enterEditorMode(new EditorCursorState(monitor.x(), monitor.y()));
+            var monitor = GameServices.level().getCurrentLevel().getObjects().stream()
+                    .filter(s -> s.objectId() == monitorId).findFirst().orElseThrow();
+            GameServices.configuration().setConfigValue(com.openggf.configuration.SonicConfiguration.EDITOR_ENABLED, true);
+            var engine = new com.openggf.Engine(com.openggf.game.session.EngineServices.current());
+            engine.enterEditorFromCurrentPlayer(null, monitor.x(), monitor.y());
+            assertEquals(com.openggf.game.GameMode.EDITOR, engine.getCurrentGameMode(), "Native editor entry must succeed before pictures");
+            var controller = engine.getLevelEditorController();
+            var level = controller.currentLevel();
+            assertNotNull(level);
+            var editor = SessionManager.getCurrentEditorMode();
             var graphics = GameServices.graphics();
             graphics.bindRuntimeManagedReferences(editor.getCamera(), graphics.getFadeManager());
-            for (int line = 0; line < level.getPaletteCount(); line++) graphics.cachePaletteTexture(level.getPalette(line), line);
-            graphics.beginPatternAtlasBatch();
-            try { for (int i = 0; i < level.getPatternCount(); i++) graphics.cachePatternTexture(level.getPattern(i), i); }
-            finally { graphics.endPatternAtlasBatch(); }
-            var controller = new LevelEditorController(); controller.setCanvasNavigationSupplier(() -> true); controller.attachLevel(level);
-            controller.configureSpawnEditing(module.createObjectRegistry(), module.getObjectPlacementEncoding());
             controller.setSpawnEditMode(EditorSpawnEditMode.OBJECTS);
             controller.setWorldCursor(new EditorCursorState(monitor.x(), monitor.y())); controller.eyedropSpawnAtCursor();
             editor.getCamera().setX((short) Math.max(0, monitor.x() - 112));
@@ -105,6 +105,14 @@ abstract class EditorPolishPictureFixture {
                 controller.setWorldCursor(new EditorCursorState(monitor.x() + 56, monitor.y()));
                 for (int i = 0; i < 3; i++) render(chrome, null, controller);
                 capture(game + "-desktop-ghost");
+                if (game == GameId.S1) {
+                    int subtype = controller.objectPalette().selectedSubtype();
+                    controller.objectPalette().setObjectId(0x42);
+                    controller.objectPalette().setSubtype(1);
+                    for (int i = 0; i < 3; i++) render(chrome, null, controller);
+                    capture(game + "-desktop-subtype");
+                    controller.objectPalette().setSubtype(subtype);
+                }
                 controller.objectPalette().setObjectKey("openggf:camera-zone");
                 controller.setWorldCursor(new EditorCursorState(monitor.x() + 32, monitor.y() - 90));
                 controller.placeObjectSpawnAtCursor();
@@ -133,6 +141,12 @@ abstract class EditorPolishPictureFixture {
                 controller.setWorldCursor(new EditorCursorState(monitor.x() + 56, monitor.y()));
                 for (int i = 0; i < 3; i++) render(null, hud, controller);
                 capture(game + "-hud-ghost");
+                if (game == GameId.S1) {
+                    controller.objectPalette().setObjectId(0x42);
+                    controller.objectPalette().setSubtype(1);
+                    for (int i = 0; i < 3; i++) render(null, hud, controller);
+                    capture(game + "-hud-subtype");
+                }
                 controller.setWorldCursor(new EditorCursorState(monitor.x() + 32, monitor.y() - 90));
                 controller.eyedropSpawnAtCursor();
                 for (int i = 0; i < 3; i++) render(null, hud, controller);
@@ -144,6 +158,7 @@ abstract class EditorPolishPictureFixture {
             }
             assertEquals(objectCount + 1, level.getObjects().size(), "Only the explicit camera placement changes authoring state");
         } finally {
+            com.openggf.Engine.clearGlobalInstance();
             priorGraphics.setProjectionWidth(priorWidth);
             priorGraphics.setProjectionMatrixBuffer(priorProjection);
             priorGraphics.setViewport(priorViewport[0], priorViewport[1], priorViewport[2], priorViewport[3]);

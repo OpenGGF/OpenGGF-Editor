@@ -209,6 +209,20 @@ or start from a directory where OpenGGF is already configured. At the title scre
 replaces the engine's built-in controller HUD. To use that HUD, run OpenGGF without
 the desktop editor on its class path.
 
+## Offscreen visual checks
+
+`TestEditorPolishS1Pictures`, `TestEditorPolishS2Pictures` and
+`TestEditorPolishS3KPictures` enter the production editor with GHZ1, EHZ1 and AIZ1,
+then capture both desktop and HUD libraries, placed sprites, ghosts, gizmos and
+Rings mode. They compare placed-monitor pixels against the ROM art separately
+from the picker. Use the engine's queued Maven wrapper with `DISPLAY` and
+`WAYLAND_DISPLAY` unset, `-Dopenggf.editor.polishPictures=true`,
+`-Dopenggf.headless.gl=surfaceless-egl`, `-DforkCount=1`, `-DreuseForks=false` and
+absolute `sonic1.rom.path`, `sonic2.rom.path`, `s3k.rom.path` properties. A fresh
+JVM per ROM prevents palette-publication state from contaminating the pictures.
+Outputs are under `target/editor-polish/`; archive reviewed evidence outside the
+repositories. Without the opt-in these picture tests skip.
+
 ## Known limits
 
 - **An internal ImGui error closes the program.** imgui-java ends the process after any

@@ -61,6 +61,7 @@ public final class EditorChromeShell implements AutoCloseable {
     private final EditorTileAtlas ghostAtlas = new EditorTileAtlas();
     private final com.openggf.editor.render.EditorObjectPreviewCache objectArt = new com.openggf.editor.render.EditorObjectPreviewCache();
     private boolean showInternalObjects;
+    private String revealedObjectSelection;
     private float libraryRight, inspectorLeft;
 
     private final ImString filter = new ImString(32);
@@ -595,6 +596,7 @@ public final class EditorChromeShell implements AutoCloseable {
         String query = filter.get().trim().toLowerCase(Locale.ROOT);
         ImGui.spacing();
         ImGui.beginChild("##objects", 0, 0, false);
+        boolean revealSelection = !palette.selectedLabel().equals(revealedObjectSelection);
         int shown = 0;
         for (var entry : palette.entries()) {
             boolean available = objectArt.available(entry);
@@ -608,7 +610,9 @@ public final class EditorChromeShell implements AutoCloseable {
                 if (entry.objectKey() != null) palette.setObjectKey(entry.objectKey()); else palette.setObjectId(entry.stockObjectId());
             }
             shown++;
-            if (!ImGui.isItemVisible()) continue;
+            boolean visible = ImGui.isItemVisible();
+            if (selected && revealSelection && !visible) ImGui.setScrollHereY(.5f);
+            if (!visible) continue;
             boolean hover = ImGui.isItemHovered();
             var draw = ImGui.getWindowDrawList();
             draw.addRectFilled(x, y, x + width, y + 64,
@@ -633,6 +637,7 @@ public final class EditorChromeShell implements AutoCloseable {
                     + "\nClick to use brush · right-click a placement to inspect");
         }
         if (shown == 0) ImGui.textWrapped("No matching objects. Clear the search or enable All / internal IDs.");
+        revealedObjectSelection = palette.selectedLabel();
         ImGui.endChild();
     }
 
