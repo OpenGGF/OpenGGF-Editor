@@ -22,14 +22,8 @@ import java.util.function.Consumer;
 
 /** Desktop presentation of the engine-owned Stageplay authoring workspace. */
 final class StageplayChromeShell implements com.openggf.stageplay.editor.StageplayRouteOverlay.Painter {
-    private float routeLabelWidth;
     @Override public void line(float x1, float y1, float x2, float y2, int rgb, float width) {
         ImGui.getBackgroundDrawList().addLine(x1, y1, x2, y2, color(rgb), width);
-    }
-    @Override public void label(float x, float y, String text, int rgb) {
-        var draw = ImGui.getBackgroundDrawList();
-        draw.addRectFilled(x - 3, y - 2, x + routeLabelWidth, y + 13, color(0x101A2B));
-        draw.addText(x, y, color(rgb), text);
     }
     private static int color(int rgb) {
         return 0xFF000000 | (rgb & 255) << 16 | (rgb & 0xFF00) | (rgb >> 16 & 255);
@@ -262,6 +256,18 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
 
     private void inspector(Frame frame) {
         if (ImGui.begin(INSPECTOR)) {
+            var route = frame.workspace.routeOverlay();
+            if (route != null) {
+                ImGui.textColored(route.result().success() ? EditorChromeTheme.SELECTION : EditorChromeTheme.WARNING, route.title());
+                ImGui.textColored(color(com.openggf.stageplay.editor.StageplayRouteOverlay.GROUND), "Cyan: walk");
+                ImGui.sameLine();
+                ImGui.textColored(color(com.openggf.stageplay.editor.StageplayRouteOverlay.AIR), "Gold: air / takeoff");
+                ImGui.textWrapped("Square: start   Diamond: goal");
+                ImGui.textWrapped(route.applied() ? "White cross: actual position" : "Red cross: stopped attempt");
+                ImGui.spacing();
+                ImGui.textWrapped(route.reason());
+                ImGui.separator();
+            }
             var controller = frame.workspace.controller();
             var actor = controller.document().actors().stream()
                     .filter(value -> value.id().equals(controller.selectedActorId())).findFirst().orElse(null);
@@ -426,7 +432,6 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
         draw.addRectFilled(x, gy, gx, gb, EditorChromeTheme.CANVAS_BG);
         draw.addRectFilled(gr, gy, right, gb, EditorChromeTheme.CANVAS_BG);
         if (frame.workspace.routeOverlay() != null) {
-            routeLabelWidth = Math.max(1, frame.gameWidth - 16);
             draw.pushClipRect(gx, gy, gr, gb, true);
             try { frame.workspace.paintRouteOverlay(this, gx, gy, frame.gameWidth, frame.gameHeight); }
             finally { draw.popClipRect(); }
@@ -441,7 +446,8 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
         ImGui.setNextWindowSize(width, STATUS_HEIGHT);
         if (ImGui.begin("##stageplayStatus", FIXED_WINDOW)) {
             String path = frame.workspace.path() == null ? "Unsaved scene" : frame.workspace.path().getFileName().toString();
-            ImGui.textDisabled(path + "   /   " + frame.workspace.status());
+            var route = frame.workspace.routeOverlay();
+            ImGui.textDisabled(path + "   /   " + (route == null ? frame.workspace.status() : route.statusText()));
         }
         ImGui.end();
     }

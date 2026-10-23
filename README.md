@@ -58,7 +58,9 @@ collision terrain. Players start at shot entry; objects can also start at an
 existing visible Puppet key after explicit Free initialization. Playable routes emit native movement/jump/stop intents
 and require fresh cold LIVE replay before **VERIFIED**. The viewport shows the
 selected player's or walking object's simulated path before Apply: cyan grounded
-segments, gold airborne arcs, start/goal markers and failed-attempt diagnostics.
+segments, gold airborne arcs and start/goal/failure markers. Route state, the legend
+and wrapped, plain-language failure explanations appear in the Direction inspector,
+with a short status line, leaving the picture clear of route text.
 Applied plans remain visible during authoring playback; a white cross marks the
 player's actual centre. The line follows camera zoom/pan and stays out of saved
 scenes, mod playback and exported films. Scene/root edits hide old plans; reopening
