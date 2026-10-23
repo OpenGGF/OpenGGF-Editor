@@ -23,6 +23,15 @@ class TestEditorChromeLayout {
         assertEquals(224, fit[3]);
     }
 
+    @Test void authoringViewportStaysInsideNarrowAndLargeDocks() {
+        for (int[] area : new int[][] {{330, 70, 930, 880}, {200, 50, 190, 100}}) {
+            int[] fit = EditorChromeHost.fitCanvasViewport(area[0], area[1], area[2], area[3], 320, 224);
+            org.junit.jupiter.api.Assertions.assertTrue(fit[0] >= area[0] && fit[1] >= area[1]);
+            org.junit.jupiter.api.Assertions.assertTrue(fit[0] + fit[2] <= area[0] + area[2]);
+            org.junit.jupiter.api.Assertions.assertTrue(fit[1] + fit[3] <= area[1] + area[3]);
+        }
+    }
+
     @Test
     void textEditingKeysReachImGui() {
         assertEquals(ImGuiKey.A, EditorChromeHost.imguiKey(GLFW_KEY_A));

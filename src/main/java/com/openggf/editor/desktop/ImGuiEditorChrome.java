@@ -67,7 +67,7 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
         int aw = Math.max(1, Math.round((area.width() - 2 * CANVAS_MARGIN) * sx));
         int ah = Math.max(1, Math.round((area.height() - 2 * CANVAS_MARGIN - CAPTION_HEIGHT) * sy));
         int[] fit = stageplayActive() ? StageplayChromeShell.fitPreview(ax, ay, aw, ah, logicalWidth, logicalHeight)
-                : EditorChromeHost.fitIntegerViewport(ax, ay, aw, ah, logicalWidth, logicalHeight);
+                : EditorChromeHost.fitCanvasViewport(ax, ay, aw, ah, logicalWidth, logicalHeight);
         // Remember the window-space rectangle for the canvas frame drawn by the shell.
         game[0] = Math.round(fit[0] / sx);
         game[1] = Math.round(fit[1] / sy);
@@ -95,6 +95,7 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
                 if (engine.stageplay() != null && commands.stream().noneMatch(command -> command.label().toLowerCase(java.util.Locale.ROOT).contains("stageplay")))
                     commands.add(new EditorCommandPalette.HostCommand("Stageplay workspace (F4)",
                             () -> pending.addLast(engine.stageplay()::activate)));
+                shell.setEditDispatcher(pending::addLast);
                 canvas = shell.draw(new EditorChromeShell.Frame(engine.controller(),
                         action -> pending.addLast(() -> engine.dispatch(action)), List.copyOf(commands),
                         game[0], game[1], game[2], game[3], game[4]));
