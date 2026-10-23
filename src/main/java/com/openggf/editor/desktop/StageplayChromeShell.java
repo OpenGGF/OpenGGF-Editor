@@ -390,7 +390,7 @@ final class StageplayChromeShell {
         for (var effect : document.cameraEffects()) rows.add(new CueRow(effect.startFrame(), "Camera shake",
                 effect.amplitudeX() + " / " + effect.amplitudeY() + " px, " + effect.frequency() + " Hz to " + effect.endFrame(), ""));
         for (var change : document.sceneChanges()) rows.add(new CueRow(change.frame(), "Scene change",
-                change.transition() + " / " + change.set().worldPolicy() + " / " + change.set().gameId() + " zone " + change.set().zone() + " act " + change.set().act(), ""));
+                change.transition() + " / " + change.set().gameId() + " zone " + change.set().zone() + " act " + change.set().act(), ""));
         rows.sort(Comparator.comparingInt(CueRow::frame));
         rowDocument = document;
         cachedRows = List.copyOf(rows);

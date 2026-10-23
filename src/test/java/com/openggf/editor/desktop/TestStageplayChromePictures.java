@@ -79,7 +79,7 @@ class TestStageplayChromePictures {
                         {"version":6,"name":"Two-way take","width":320,"height":224,
                          "cast":[{"id":"hero","name":"Sonic","gameId":"s2","character":"sonic","puppet":false}],
                          "shots":[{"id":"opening","durationFrames":120,
-                         "set":{"gameId":"s2","zone":0,"act":0,"worldPolicy":"LIVE"},
+                         "set":{"gameId":"s2","zone":0,"act":0},
                          "camera":[{"frame":0,"x":0,"y":500}],"actors":{"hero":[
                          {"frame":0,"x":128,"y":648,"animation":5},{"frame":30,"x":128,"y":648,"animation":5},
                          {"frame":90,"x":256,"y":648,"animation":5},{"frame":119,"x":256,"y":648,"animation":5}]},
@@ -118,7 +118,7 @@ class TestStageplayChromePictures {
     }
 
     @Test
-    void captureAnimatedCameraFormForBothNativeContentsPolicies() throws Exception {
+    void captureAnimatedCameraFormForNativeWorld() throws Exception {
         assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
         assertEquals("surfaceless-egl",System.getProperty("openggf.headless.gl"));
         Path rom=Path.of(System.getProperty("sonic2.rom.path"));
@@ -126,16 +126,14 @@ class TestStageplayChromePictures {
         try (var boot=new HeadlessGameBoot(1600,900,320,224,320,224)) {
             boot.setBootToTitle(true); boot.boot(rom,0,0);
             try (var renderer=new EditorProjectMenuRenderer()) {
-                for (var policy : List.of(StageplayDocument.WorldPolicy.LIVE)) {
-                    var scene=StageplayDocument.empty("s2",0,0,0,500,320,224)
-                            .withSet(new StageplayDocument.SetSource("s2",0,0,"","",policy));
-                    var workspace=new StageplayWorkspace(() -> scene);
-                    workspace.activate(); workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY); choose(workspace,0);
-                    workspace.menu().setValue("zoom","1.5");
-                    workspace.menu().setValue("interpolation","SMOOTH");
-                    renderMenu(renderer,workspace,1600,900);
-                    capture("camera-animated-"+policy.name().toLowerCase(java.util.Locale.ROOT),1600,900);
-                }
+                var scene=StageplayDocument.empty("s2",0,0,0,500,320,224)
+                        .withSet(new StageplayDocument.SetSource("s2",0,0,"",""));
+                var workspace=new StageplayWorkspace(() -> scene);
+                workspace.activate(); workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY); choose(workspace,0);
+                workspace.menu().setValue("zoom","1.5");
+                workspace.menu().setValue("interpolation","SMOOTH");
+                renderMenu(renderer,workspace,1600,900);
+                capture("camera-animated-native-world",1600,900);
             }
         }
     }
@@ -159,7 +157,7 @@ class TestStageplayChromePictures {
                 int[] start = GameServices.module().getZoneRegistry().getStartPosition(0, 0);
                 double x = Math.max(0, start[0] - 80), y = Math.max(0, start[1] - 140);
                 var scene = StageplayDocument.empty("s2", 0, 0, x, y, 384, 216)
-                        .withSet(new StageplayDocument.SetSource("s2",0,0,"","",StageplayDocument.WorldPolicy.LIVE)).withName("The next adventure")
+                        .withSet(new StageplayDocument.SetSource("s2",0,0,"","")).withName("The next adventure")
                         .withActors(List.of(
                                 new StageplayDocument.Actor("hero", "Sonic", "s2", "sonic", List.of(key(0, x + 80, start[1], -1), key(120, x + 160, start[1], 1),key(240,x+80,start[1],-1))),
                                 new StageplayDocument.Actor("friend", "Tails", "s2", "tails", List.of(key(0, x + 220, start[1], -1),key(240,x+220,start[1],-1)))))
@@ -182,6 +180,9 @@ class TestStageplayChromePictures {
                     public StageplayDocument initialDocument() { return scene; }
                     public StageplayTimeline.Frame resolvePreview(StageplayDocument document,Path root,int frame) throws java.io.IOException {
                         return resources.resolveFrame(document,StageplayTimeline.sample(document,frame));
+                    }
+                    public StageplayTimeline.Frame resolvePreview(StageplayDocument document,Path root,StageplayTimeline.Frame frame) {
+                        return resources.resolveFrame(document,frame);
                     }
                 });
                 workspace.activate();
@@ -211,7 +212,9 @@ class TestStageplayChromePictures {
                 render(chrome, surface,scene,1600,900);
                 capture("commands",1600,900);
                 chrome.key(GLFW_KEY_ESCAPE,GLFW_PRESS,0); chrome.update(new InputHandler());
-                workspace.invoke(StageplayWorkspace.Action.CAMERA_MODE); workspace.moveCamera(8,0,2);
+                workspace.invoke(StageplayWorkspace.Action.CAMERA_MODE); workspace.moveCamera(8,100000,2);
+                assertTrue(workspace.directorCamera().y() < 100000, "Inspector must display native-bounded draft framing");
+                assertEquals(scene.camera(), workspace.controller().document().camera(), "Draft clamp cannot rewrite keys");
                 surface.record(scene.width(),scene.height(),canvas -> renderer.draw(workspace.previewDocument(),workspace.previewFrame(),canvas));
                 for (int i=0;i<4;i++) render(chrome,surface,scene,1280,720);
                 capture("camera-720p",1280,720);
@@ -309,6 +312,9 @@ class TestStageplayChromePictures {
                     public StageplayDocument initialDocument() { return scene; }
                     public StageplayTimeline.Frame resolvePreview(StageplayDocument document,Path root,int frame) throws java.io.IOException {
                         return resources.resolveFrame(document,StageplayTimeline.sample(document,frame));
+                    }
+                    public StageplayTimeline.Frame resolvePreview(StageplayDocument document,Path root,StageplayTimeline.Frame frame) {
+                        return resources.resolveFrame(document,frame);
                     }
                 });
                 workspace.activate(); workspace.selectActor("tails"); workspace.seek(150);

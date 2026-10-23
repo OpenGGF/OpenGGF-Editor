@@ -48,7 +48,7 @@ not reconstructed.
 
 With a level open, press **F4** or choose **File → Stageplay workspace**. New actors use
 **Puppet** mode: native character physics and floor snapping. Set the initial world centre near the floor;
-snapping checks the native feet sensors up to 128 pixels below. Move the playhead and
+snapping uses the native feet/attachment sensors near that anchor. Move the playhead and
 choose **Move / jump / stop** or press **K**. A move specifies a destination and urgency
 as a fraction of native maximum speed; the character tries to reach it through actual
 acceleration and collision. Jump uses the native jump and a chosen button hold. Stop
@@ -89,7 +89,9 @@ preview/export workers without joined ROM files. Formats are unpublished: only
 the current version-seven document and version-six screenplay are accepted.
 
 Camera keys can follow one actor or a group, with dead zones, look-ahead, smoothing
-and offsets. Set **follow** to comma-separated actor IDs in the camera-key form.
+and offsets. Authored cameras, shake and paused director drafts are evaluated within
+the native level camera envelope at the current viewport and zoom. The inspector
+shows that resolved framing while stored keys keep their authored values. Set **follow** to comma-separated actor IDs in the camera-key form.
 Pan, shake, transitions and Q/E zoom are available in every shot. Native object lifetime
 and slot limits still apply; the bounded route helper emits existing movement
 commands and verifies its candidate.

@@ -215,6 +215,26 @@ class TestStageplayChrome {
     }
 
     @Test
+    void desktopDirectorDisplaysResolvedBoundsWithoutRewritingStoredKeys() {
+        var document = StageplayDocument.empty("s1", 0, 0, 0, 832, 320, 224);
+        var workspace = new StageplayWorkspace(new StageplayWorkspace.Host() {
+            public StageplayDocument initialDocument() { return document; }
+            public StageplayTimeline.Frame resolvePreview(
+                    StageplayDocument doc, Path root, int frame) {
+                var authored = StageplayTimeline.sample(doc, frame);
+                var camera = new StageplayTimeline.CameraPose(0, 768, 1);
+                return new StageplayTimeline.Frame(authored.frame(), authored.actors(), camera,
+                        authored.captions(), authored.set(), authored.transition(), camera, authored.dialogue(),
+                        authored.puppets(), authored.world());
+            }
+        });
+        workspace.activate();
+        assertEquals(768, workspace.directorCamera().y());
+        assertEquals(768, workspace.previewFrame().camera().y());
+        assertEquals(832, workspace.controller().document().camera().getFirst().y());
+    }
+
+    @Test
     void cameraModePassesMotionKeysCapturesThroughQueueAndSuspendsForPalette() throws Exception {
         var workspace = workspace(); workspace.activate(); var chrome = chrome(workspace);
         chrome.key(GLFW_KEY_C,GLFW_PRESS,0); assertFalse(workspace.cameraMode());
@@ -297,32 +317,30 @@ class TestStageplayChrome {
     }
 
     @Test
-    void nativeContentsPoliciesExposeTheSameFramingAndSaveContract(@TempDir Path root) throws Exception {
-        for (var policy : List.of(StageplayDocument.WorldPolicy.LIVE)) {
-            var document = StageplayDocument.empty("s2", 0, 0, 0, 500, 384, 216)
-                    .withSet(new StageplayDocument.SetSource("s2", 0, 0, "", "", policy));
-            var workspace = new StageplayWorkspace(() -> document); workspace.activate();
-            workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY); choose(workspace, 0);
-            workspace.menu().setValue("zoom", "1.5");
-            workspace.menu().setValue("interpolation", "SMOOTH"); workspace.menu().submit();
-            assertNull(workspace.menu().error(), policy.name());
-            assertEquals(1.5, workspace.controller().document().camera().getFirst().zoom());
-            assertEquals(216, workspace.controller().document().height());
-            assertTrue(StageplayChromeShell.worldLabel(workspace).startsWith("Native world"));
-            workspace.seek(60); workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY); choose(workspace, 0);
-            workspace.menu().setValue("zoom", ".75"); workspace.menu().submit();
-            assertNull(workspace.menu().error(), policy.name());
-            assertEquals(1.125, com.openggf.stageplay.StageplayTimeline.sample(
-                    workspace.controller().document(), 30).camera().zoom());
-            var path = root.resolve(policy.name() + ".stageplay"); workspace.saveTo(path);
-            assertEquals(workspace.controller().document(), com.openggf.stageplay.StageplayStore.read(path));
-        }
+    void nativeWorldExposesAnimatedFramingAndSaveContract(@TempDir Path root) throws Exception {
+        var document = StageplayDocument.empty("s2", 0, 0, 0, 500, 384, 216)
+                .withSet(new StageplayDocument.SetSource("s2", 0, 0, "", ""));
+        var workspace = new StageplayWorkspace(() -> document); workspace.activate();
+        workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY); choose(workspace, 0);
+        workspace.menu().setValue("zoom", "1.5");
+        workspace.menu().setValue("interpolation", "SMOOTH"); workspace.menu().submit();
+        assertNull(workspace.menu().error());
+        assertEquals(1.5, workspace.controller().document().camera().getFirst().zoom());
+        assertEquals(216, workspace.controller().document().height());
+        assertTrue(StageplayChromeShell.worldLabel(workspace).startsWith("Native world"));
+        workspace.seek(60); workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY); choose(workspace, 0);
+        workspace.menu().setValue("zoom", ".75"); workspace.menu().submit();
+        assertNull(workspace.menu().error());
+        assertEquals(1.125, StageplayTimeline.sample(
+                workspace.controller().document(), 30).camera().zoom());
+        var path = root.resolve("native-world.stageplay"); workspace.saveTo(path);
+        assertEquals(workspace.controller().document(), com.openggf.stageplay.StageplayStore.read(path));
     }
 
     @Test
     void liveDirectionRoundTripsTargetsWaitsAbilitiesAndFollowThroughSharedForms(@TempDir Path root) throws Exception {
         var document = StageplayDocument.empty("s3k",0,0,0,0,320,224)
-                .withSet(new StageplayDocument.SetSource("s3k",0,0,"","",StageplayDocument.WorldPolicy.LIVE));
+                .withSet(new StageplayDocument.SetSource("s3k",0,0,"",""));
         var workspace = new StageplayWorkspace(() -> document); workspace.activate();
         workspace.invoke(StageplayWorkspace.Action.ADD_ACTOR);
         workspace.menu().setValue("name","Tails"); workspace.menu().setValue("character","tails"); workspace.menu().submit();
