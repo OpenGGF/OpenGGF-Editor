@@ -119,6 +119,7 @@ abstract class EditorPolishPictureFixture {
                 for (int i = 0; i < 3; i++) render(chrome, null, controller);
                 capture(game + "-desktop-gizmo");
                 controller.setSpawnEditMode(EditorSpawnEditMode.RINGS);
+                controller.setWorldCursor(new EditorCursorState(monitor.x() + 80, monitor.y() - 40));
                 for (int i = 0; i < 3; i++) render(chrome, null, controller);
                 capture(game + "-desktop-rings");
             }
@@ -152,6 +153,7 @@ abstract class EditorPolishPictureFixture {
                 for (int i = 0; i < 3; i++) render(null, hud, controller);
                 capture(game + "-hud-gizmo");
                 controller.setSpawnEditMode(EditorSpawnEditMode.RINGS);
+                controller.setWorldCursor(new EditorCursorState(monitor.x() + 80, monitor.y() - 40));
                 for (int i = 0; i < 3; i++) render(null, hud, controller);
                 assertMonitorVisible(hud, controller, monitor);
                 capture(game + "-hud-rings");
