@@ -56,7 +56,13 @@ brakes. The inspector shows actual position and moving, arrived or blocked state
 Choose **Direct → Route helper** for bounded planning over the set's actual
 collision terrain. Players start at shot entry; objects can also start at an
 existing visible Puppet key after explicit Free initialization. Playable routes emit native movement/jump/stop intents
-and require fresh cold LIVE replay before **VERIFIED**. Object Puppet routes use
+and require fresh cold LIVE replay before **VERIFIED**. The viewport shows the
+selected player's or walking object's simulated path before Apply: cyan grounded
+segments, gold airborne arcs, start/goal markers and failed-attempt diagnostics.
+Applied plans remain visible during authoring playback; a white cross marks the
+player's actual centre. The line follows camera zoom/pan and stays out of saved
+scenes, mod playback and exported films. Scene/root edits hide old plans; reopening
+a scene does not restore this temporary editor aid. Object Puppet routes use
 explicit visual clearance and speed, remain AI-free, and report **VISUAL_TERRAIN**.
 Planning runs in its own cancellable worker; review diagnostics, then apply a
 matching result as one undo step. Changed scenes, ROMs or project assets invalidate

@@ -21,7 +21,20 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 /** Desktop presentation of the engine-owned Stageplay authoring workspace. */
-final class StageplayChromeShell {
+final class StageplayChromeShell implements com.openggf.stageplay.editor.StageplayRouteOverlay.Painter {
+    private float routeLabelWidth;
+    @Override public void line(float x1, float y1, float x2, float y2, int rgb, float width) {
+        ImGui.getBackgroundDrawList().addLine(x1, y1, x2, y2, color(rgb), width);
+    }
+    @Override public void label(float x, float y, String text, int rgb) {
+        var draw = ImGui.getBackgroundDrawList();
+        draw.addRectFilled(x - 3, y - 2, x + routeLabelWidth, y + 13, color(0x101A2B));
+        draw.addText(x, y, color(rgb), text);
+    }
+    private static int color(int rgb) {
+        return 0xFF000000 | (rgb & 255) << 16 | (rgb & 0xFF00) | (rgb >> 16 & 255);
+    }
+
     record Frame(StageplayWorkspace workspace, Consumer<Runnable> queue,
                  int gameX, int gameY, int gameWidth, int gameHeight, int gameScale) {
         void invoke(Action action) { queue.accept(() -> workspace.invoke(action)); }
@@ -227,6 +240,13 @@ final class StageplayChromeShell {
                     ImGui.spacing();
                 } finally { ImGui.popID(); }
             }
+            for (var actor : frame.workspace.controller().document().objectActors()) {
+                ImGui.pushID(actor.id());
+                try {
+                    if (ImGui.selectable(actor.name(), actor.id().equals(frame.workspace.controller().selectedActorId()))) frame.select(actor.id());
+                    ImGui.textDisabled(actor.gameId().toUpperCase(Locale.ROOT) + " / Object");
+                } finally { ImGui.popID(); }
+            }
             ImGui.separator();
             if (ImGui.button("Scene and set", -1, 0)) frame.invoke(Action.SCENE);
             if (ImGui.button("Camera key", -1, 0)) frame.invoke(Action.CAMERA_KEY);
@@ -405,6 +425,12 @@ final class StageplayChromeShell {
         draw.addRectFilled(x, gb, right, bottom, EditorChromeTheme.CANVAS_BG);
         draw.addRectFilled(x, gy, gx, gb, EditorChromeTheme.CANVAS_BG);
         draw.addRectFilled(gr, gy, right, gb, EditorChromeTheme.CANVAS_BG);
+        if (frame.workspace.routeOverlay() != null) {
+            routeLabelWidth = Math.max(1, frame.gameWidth - 16);
+            draw.pushClipRect(gx, gy, gr, gb, true);
+            try { frame.workspace.paintRouteOverlay(this, gx, gy, frame.gameWidth, frame.gameHeight); }
+            finally { draw.popClipRect(); }
+        }
         draw.addRect(gx - 1, gy - 1, gr + 1, gb + 1, EditorChromeTheme.GRID_LINE);
         draw.addText(gx, gb + 5, EditorChromeTheme.TEXT_DIM, "Stage preview / "
                 + (frame.gameScale == 0 ? "fit" : frame.gameScale + "x") + " / frame " + frame.workspace.controller().frame());
