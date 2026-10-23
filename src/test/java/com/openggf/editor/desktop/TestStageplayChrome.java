@@ -38,7 +38,7 @@ class TestStageplayChrome {
         workspace.activate();var queue=new ArrayDeque<Runnable>();
         var frame=new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
         frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);assertFalse(workspace.menu().isOpen());queue.removeFirst().run();
-        assertEquals("Route attempts (object AI off)",workspace.menu().title());
+        assertEquals("Plan playable route",workspace.menu().title());
         workspace.menu().setValue("x","240");workspace.menu().setValue("y","648");workspace.menu().setValue("frames","90");workspace.menu().submit();
         assertNull(workspace.menu().error());assertEquals("hero",request.get().actorId());assertNull(request.get().footprint());
         assertEquals(scene,workspace.controller().document());assertFalse(workspace.controller().canUndo());
