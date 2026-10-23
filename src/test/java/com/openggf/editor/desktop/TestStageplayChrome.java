@@ -30,6 +30,9 @@ class TestStageplayChrome {
                 .withPuppets(List.of(new StageplayDocument.PuppetTrack("hero",true,0,List.of())));
         var workspace=new StageplayWorkspace(new StageplayWorkspace.Host(){
             public StageplayDocument initialDocument(){return scene;}
+            public java.util.Set<com.openggf.game.CharacterDefinition.MovementAbility> movementAbilities(StageplayDocument.Actor actor,Path root){
+                return java.util.Set.of(com.openggf.game.CharacterDefinition.MovementAbility.SPINDASH);
+            }
             public void startRoute(StageplayDocument document,Path root,com.openggf.stageplay.route.StageplayRouteRequest value){request.set(value);}
             public com.openggf.stageplay.editor.StageplayRouteJob.Update pollRoute(){return request.get()==null?null:
                     new com.openggf.stageplay.editor.StageplayRouteJob.Update(1,com.openggf.stageplay.editor.StageplayRouteJob.Phase.PLANNING,"working",null);}
@@ -39,6 +42,11 @@ class TestStageplayChrome {
         var frame=new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
         frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);assertFalse(workspace.menu().isOpen());queue.removeFirst().run();
         assertEquals("Plan playable route",workspace.menu().title());
+        workspace.menu().setValue("startingAction","Spindash");
+        assertEquals("Run",workspace.menu().values().get("travelSpeed"));
+        workspace.menu().setValue("travelSpeed","Walk");workspace.menu().submit();
+        assertTrue(workspace.menu().error().contains("Spindash requires Run"));
+        workspace.menu().setValue("travelSpeed","Run");
         workspace.menu().setValue("x","240");workspace.menu().setValue("y","648");workspace.menu().setValue("frames","90");workspace.menu().submit();
         assertNull(workspace.menu().error());assertEquals("hero",request.get().actorId());assertNull(request.get().footprint());
         assertEquals(scene,workspace.controller().document());assertFalse(workspace.controller().canUndo());

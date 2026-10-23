@@ -352,9 +352,9 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
             case CROUCH -> "Crouch for " + command.holdFrames() + " frames";
             case LOOK_UP -> "Look up for " + command.holdFrames() + " frames";
             case SPINDASH -> "Charge spindash";
-                case FACE_LEFT -> "Face left";
-                case FACE_RIGHT -> "Face right";
-                case ROLL -> "Native roll";
+            case FACE_LEFT -> "Face left";
+            case FACE_RIGHT -> "Face right";
+            case ROLL -> "Native roll";
         };
         return detail + (command.timeoutFrames() > 0 ? " / timeout " + command.timeoutFrames() + " frames" : "");
     }

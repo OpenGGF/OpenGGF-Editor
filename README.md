@@ -264,3 +264,7 @@ overshoot endings and final facing in the shared route form. Select a motion row
 to cycle choices; spindash is offered only for a capable actor/donor. Applied and
 proposed route chrome shows the retained motion choices beside its observed line.
 Walking objects retain their visual mover and clearance fields.
+
+Route motion uses the shared engine contract: choosing Spindash selects Run;
+Spindash + Walk is rejected with an explanation. Saved unavailable starts remain
+visible for repair. Direct steering is tried before penalised run-up detours.
