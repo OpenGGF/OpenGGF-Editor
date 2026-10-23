@@ -244,10 +244,14 @@ public final class EditorChromeHost implements AutoCloseable {
         ImGui.destroyContext();
     }
 
-    /**
-     * Largest integer scale of {@code logicalWidth}x{@code logicalHeight} that fits {@code area},
-     * centred in it. {@code area} and the result use framebuffer pixels with a top-left origin.
-     */
+    /** Fits the authoring canvas inside its panels, including small windows and narrow docks. */
+    public static int[] fitCanvasViewport(int x, int y, int width, int height, int logicalWidth, int logicalHeight) {
+        double scale = Math.min(width / (double) Math.max(1, logicalWidth), height / (double) Math.max(1, logicalHeight));
+        int w = Math.max(1, (int) (logicalWidth * scale)), h = Math.max(1, (int) (logicalHeight * scale));
+        return new int[] {x + (width - w) / 2, y + (height - h) / 2, w, h, Math.max(1, (int) scale)};
+    }
+
+    /** Largest integer scale, centred in the area. All coordinates use framebuffer pixels with a top-left origin. */
     public static int[] fitIntegerViewport(int areaX, int areaY, int areaWidth, int areaHeight,
                                            int logicalWidth, int logicalHeight) {
         int scale = Math.max(1, Math.min(areaWidth / Math.max(1, logicalWidth),

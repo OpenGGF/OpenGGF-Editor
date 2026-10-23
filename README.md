@@ -19,8 +19,12 @@ in OpenGGF.
 
 ## What it has today
 
-- **Library:** ROM-decoded thumbnails of every block, chunk and pattern, with a hex filter
-  and a size slider.
+- **Library:** ROM-decoded thumbnails of blocks, chunks, patterns and objects. The object
+  list pairs real mapping frames with readable names and hides internal IDs by default;
+  **All / internal IDs** reveals the complete list. Terrain has a hex filter and size slider.
+- **Canvas:** sprite placements and translucent brush previews use the level palette,
+  native origins and flips. Compact region chips stay legible when zoomed. The picture
+  fits between docked panels, including small windows and narrow docks.
 - **Inspector:**
   - World: the brush and the cell under the cursor.
   - Block: an 8x8 composition grid (click to paint, right-click to pick), flips, solidity
