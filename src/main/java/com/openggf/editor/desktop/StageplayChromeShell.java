@@ -265,6 +265,7 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
                 ImGui.textWrapped("Square: start   Diamond: goal");
                 ImGui.textWrapped(route.applied() ? "White cross: actual position" : "Red cross: stopped attempt");
                 ImGui.spacing();
+                ImGui.textWrapped(route.motionSummary());
                 ImGui.textWrapped(route.reason());
                 ImGui.separator();
             }

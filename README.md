@@ -257,3 +257,10 @@ GPL-3.0, the same as OpenGGF; see [LICENSE](LICENSE). Bundled third-party compon
 
 OpenGGF and this editor are independent fan projects with no affiliation with Sega. No
 game data is included.
+
+
+Stageplay playable routes expose starting action, Walk/Run travel, gentle/hard/
+overshoot endings and final facing in the shared route form. Select a motion row
+to cycle choices; spindash is offered only for a capable actor/donor. Applied and
+proposed route chrome shows the retained motion choices beside its observed line.
+Walking objects retain their visual mover and clearance fields.
