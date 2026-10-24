@@ -60,6 +60,7 @@ class TestStageplayRouteOverlayPictures {
                     public StageplayRouteJob.Update pollRoute(){return session.pollRoute();}
                     public void requestRouteApply(StageplayDocument d,Path root) throws java.io.IOException {session.requestRouteApply(d,root);}
                     public void cancelRoute(){session.cancelRoute();}
+                    public StageplayGround.Report ground(StageplayDocument d,Path root,int frame,StageplayGround.Batch batch)throws java.io.IOException{return session.ground(d,root,frame,batch);}
                 });
                 workspace.activate();workspace.selectActor("hero");workspace.seek(30);
                 var level=new LevelEditorController();
@@ -73,11 +74,25 @@ class TestStageplayRouteOverlayPictures {
                 workspace.invoke(StageplayWorkspace.Action.ROUTE_HELPER);
                 workspace.menu().setValue("x","400");workspace.menu().setValue("y","624");
                 assertEquals("Walk",workspace.menu().values().get("travelSpeed"));
+                workspace.menu().pick("x");workspace.pickPoint(320,600);workspace.positionPicker().refreshFloor();
+                assertNotNull(workspace.positionPicker().floor(),workspace.positionPicker().detail());
+                for(int warm=0;warm<4;warm++)draw(chrome,session,workspace);
+                video.frame(output.resolve("desktop-position-picker.png"));
+                var pickView=workspace.previewFrame().camera();
+                var pickViewport=chrome.gameViewport(WIDTH,HEIGHT,WIDTH,HEIGHT,source.width(),source.height());
+                double mouseX=pickViewport[0]+(320-pickView.x())*pickView.zoom()*pickViewport[2]/source.width();
+                double mouseY=HEIGHT-pickViewport[1]-pickViewport[3]+(600-pickView.y())*pickView.zoom()*pickViewport[3]/source.height();
+                chrome.mouseMove(mouseX,mouseY);chrome.mouseButton(0,org.lwjgl.glfw.GLFW.GLFW_PRESS);draw(chrome,session,workspace);
+                chrome.mouseButton(0,org.lwjgl.glfw.GLFW.GLFW_RELEASE);draw(chrome,session,workspace);draw(chrome,session,workspace);
+                assertFalse(workspace.pickingPosition(),"A canvas click confirms through the queued frontend path");
+                assertEquals("320",workspace.menu().values().get("x"));assertEquals(source,workspace.controller().document());
+                workspace.menu().setValue("x","400");workspace.menu().setValue("y","624");
+                chrome.mouseMove(-100,-100);
                 for(int i=0;i<120;i++){
                     draw(chrome,session,workspace);
                     glViewport(0,0,WIDTH,HEIGHT);
                     int menuWidth=Math.round(WIDTH*224f/HEIGHT);
-                    modal.render(workspace.menu(),new org.joml.Matrix4f().ortho2D(0,menuWidth,0,224).get(new float[16]),menuWidth);
+                    if(!chrome.handlesMenu(workspace.menu())) modal.render(workspace.menu(),new org.joml.Matrix4f().ortho2D(0,menuWidth,0,224).get(new float[16]),menuWidth);
                     video.frame(i==0?output.resolve("desktop-motion-settings.png"):null);
                 }
                 workspace.menu().submit();assertNull(workspace.menu().error());
@@ -90,6 +105,9 @@ class TestStageplayRouteOverlayPictures {
                 StageplayStore.write(output.resolve("desktop-source.stageplay"),source);
                 assertNotNull(workspace.routeOverlay()); assertFalse(workspace.routeOverlay().applied());
                 assertEquals("Route proposed",workspace.routeOverlay().title());
+                workspace.invoke(StageplayWorkspace.Action.ROUTE_HELPER);
+                for(int warm=0;warm<4;warm++)draw(chrome,session,workspace);
+                assertTrue(workspace.menu().isOpen());video.frame(output.resolve("desktop-route-ready-menu.png"));
                 workspace.menu().close();
                 for(int warm=0;warm<4;warm++)draw(chrome,session,workspace);
                 for(int i=0;i<60;i++){draw(chrome,session,workspace);video.frame(i==0?output.resolve("desktop-proposed.png"):null);}
@@ -127,6 +145,10 @@ class TestStageplayRouteOverlayPictures {
                 assertEquals("Route search limit reached.",workspace.status());
                 assertTrue(workspace.routeOverlay().reason().contains("Reachability is still unknown"));
                 Files.writeString(output.resolve("desktop-failed-result.json"),StageplayRouteProtocol.encodeResult(failed));
+                workspace.invoke(StageplayWorkspace.Action.ROUTE_HELPER);
+                draw(chrome,session,workspace);glViewport(0,0,WIDTH,HEIGHT);
+                if(!chrome.handlesMenu(workspace.menu())) modal.render(workspace.menu(),new org.joml.Matrix4f().ortho2D(0,WIDTH*224f/HEIGHT,0,224).get(new float[16]),Math.round(WIDTH*224f/HEIGHT));
+                video.frame(output.resolve("desktop-route-failed-menu.png"));
                 workspace.menu().close();
                 for(int i=0;i<60;i++){draw(chrome,session,workspace);video.frame(i==0?output.resolve("desktop-failed.png"):null);}
                 // A camera draft changes only projection, never the samples.

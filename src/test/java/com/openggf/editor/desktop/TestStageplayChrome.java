@@ -24,6 +24,41 @@ import static org.lwjgl.glfw.GLFW.*;
 /** Desktop input and commands use the same authoring objects as the built-in HUD. */
 class TestStageplayChrome {
     @Test
+    void nativeFormsOwnOnlyStructuredMenusAndQueueApplyAndClose() throws Exception {
+        var workspace=workspace();workspace.activate();workspace.invoke(StageplayWorkspace.Action.ADD_ACTOR);workspace.menu().submit();
+        var before=workspace.controller().document();
+        var chrome=chrome(workspace);
+        workspace.invoke(StageplayWorkspace.Action.ROUTE_HELPER);
+        assertTrue(chrome.handlesMenu(workspace.menu()));
+        assertFalse(chrome.key(GLFW_KEY_ENTER,GLFW_PRESS,0));
+        assertNull(workspace.menu().error(),"Apply waits for the editor tick");
+        chrome.update(new InputHandler());
+        assertTrue(workspace.menu().isOpen());
+        assertTrue(workspace.menu().error().contains("unavailable"),"The original host error stays reviewable");
+        assertEquals(before,workspace.controller().document());
+        assertFalse(chrome.key(GLFW_KEY_ESCAPE,GLFW_PRESS,0));
+        assertTrue(workspace.menu().isOpen());chrome.update(new InputHandler());assertFalse(workspace.menu().isOpen());
+        workspace.invoke(StageplayWorkspace.Action.CAPTION);assertTrue(chrome.handlesMenu(workspace.menu()),"Every shared Stageplay menu has a native view");
+        workspace.invoke(StageplayWorkspace.Action.DIALOGUE);choose(workspace,0);choose(workspace,0);
+        assertTrue(chrome.handlesMenu(workspace.menu()));workspace.menu().editField("portrait");
+        assertFalse(chrome.handlesMenu(workspace.menu()),"The shared path browser remains reachable");
+    }
+
+    @Test
+    void pickerKeysReachWorkspaceAndConfirmOrCancelOnlyChangesTheForm() throws Exception {
+        var workspace=workspace();workspace.activate();workspace.invoke(StageplayWorkspace.Action.ADD_ACTOR);workspace.menu().submit();
+        workspace.invoke(StageplayWorkspace.Action.ROUTE_HELPER);var values=workspace.menu().values();var scene=workspace.controller().document();
+        var chrome=chrome(workspace);workspace.menu().pick("x");assertFalse(chrome.handlesMenu(workspace.menu()));
+        assertTrue(chrome.key(GLFW_KEY_RIGHT,GLFW_PRESS,0));assertTrue(chrome.key(GLFW_KEY_LEFT_SHIFT,GLFW_PRESS,GLFW_MOD_SHIFT));
+        workspace.tick(new InputHandler());workspace.pickPoint(321,600);
+        assertTrue(chrome.key(GLFW_KEY_ESCAPE,GLFW_PRESS,0));
+        var input=new InputHandler();input.handleKeyEvent(GLFW_KEY_ESCAPE,GLFW_PRESS);input.refreshLogicalSnapshot();workspace.tick(input);
+        assertFalse(workspace.pickingPosition());assertTrue(chrome.handlesMenu(workspace.menu()));assertEquals(values,workspace.menu().values());
+        workspace.menu().pick("x");workspace.pickPoint(321,600);workspace.confirmPositionPick();
+        assertEquals("321",workspace.menu().values().get("x"));assertEquals("600",workspace.menu().values().get("y"));assertEquals(scene,workspace.controller().document());
+    }
+
+    @Test
     void desktopVoiceFormUsesSharedCastSelectionAndUndo() {
         var workspace = workspace(); workspace.activate();
         var queue = new ArrayDeque<Runnable>();
@@ -70,7 +105,7 @@ class TestStageplayChrome {
         workspace.activate();var queue=new ArrayDeque<Runnable>();
         var frame=new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
         frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);assertFalse(workspace.menu().isOpen());queue.removeFirst().run();
-        assertEquals("Plan playable route",workspace.menu().title());
+        assertEquals("Plan route",workspace.menu().title());
         workspace.menu().setValue("startingAction","Spindash");
         assertEquals("Run",workspace.menu().values().get("travelSpeed"));
         workspace.menu().setValue("travelSpeed","Walk");workspace.menu().submit();
@@ -316,9 +351,9 @@ class TestStageplayChrome {
         assertFalse(workspace.menu().isOpen()); queue.removeFirst().run();
         assertEquals("Dialogue lines",workspace.menu().title()); workspace.menu().close();
         frame.invoke(StageplayWorkspace.Action.DIALOGUE_TYPERS); queue.removeFirst().run();
-        assertEquals("Reusable dialogue typers",workspace.menu().title()); workspace.menu().close();
+        assertEquals("Dialogue typing",workspace.menu().title()); workspace.menu().close();
         frame.invoke(StageplayWorkspace.Action.DIALOGUE_SKINS); queue.removeFirst().run();
-        assertEquals("Reusable dialogue decorations",workspace.menu().title()); workspace.menu().close();
+        assertEquals("Dialogue styles",workspace.menu().title()); workspace.menu().close();
         workspace.invoke(StageplayWorkspace.Action.ADD_ACTOR); workspace.menu().setValue("name","Sonic"); workspace.menu().submit();
         String actor=workspace.controller().selectedActorId();
         var doc=workspace.controller().document().withDialogue(List.of(new StageplayDocument.DialogueCue(
@@ -348,7 +383,7 @@ class TestStageplayChrome {
         var rows=new StageplayChromeShell(new EditorChromeHost()).cueRows(document);
         assertEquals(List.of(0,0,0,10,40),rows.stream().map(StageplayChromeShell.CueRow::frame).toList());
         var move=rows.stream().filter(r -> r.track().endsWith("MOVE_TO")).findFirst().orElseThrow();
-        assertTrue(move.detail().contains("300.00, 112.00 / 50%")); assertEquals(track.actorId(),move.actorId());
+        assertTrue(move.detail().contains("300, 112 / 50%")); assertEquals(track.actorId(),move.actorId());
         assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("JUMP")));
         assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("STOP")));
     }
@@ -401,9 +436,9 @@ class TestStageplayChrome {
         Path saved=root.resolve("live.stageplay"); StageplayStore.write(saved,scene);
         assertEquals(scene,StageplayStore.read(saved));
         var rows=new StageplayChromeShell(new EditorChromeHost()).cueRows(StageplayStore.read(saved));
-        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("MOVE_TO") && r.detail().contains("Layout #179 + 16.00, 0.00") && r.detail().contains("timeout 120")));
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("MOVE_TO") && r.detail().contains("Layout #179 + 16, 0") && r.detail().contains("timeout 120")));
         assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("WAIT") && r.detail().contains("ON_OBJECT") && r.detail().contains("Layout #179")));
-        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("FLY_TO") && r.detail().contains("200.00, 80.00 / 50%")));
+        assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("FLY_TO") && r.detail().contains("200, 80 / 50%")));
         assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("HOVER") && r.detail().contains("30 frames")));
         assertTrue(rows.stream().anyMatch(r -> r.track().endsWith("RELEASE") && r.detail().equals("Release native controls")));
         assertTrue(rows.stream().anyMatch(r -> r.track().equals("Camera") && r.detail().equals("Follow " + actor)));
@@ -437,6 +472,7 @@ class TestStageplayChrome {
         var chrome = new ImGuiEditorChrome();
         set(chrome, "shell", new EditorChromeShell(new EditorChromeHost()));
         set(chrome, "stageplayShell", new StageplayChromeShell(new EditorChromeHost()));
+        set(chrome, "stageplayForm", new StageplayFormView(new EditorChromeHost()));
         set(chrome, "engine", new EditorWindowChrome.Host() {
             public LevelEditorController controller() { return new LevelEditorController(); }
             public void dispatch(EditorInputHandler.Action action) { fail("Stageplay input reached terrain editing"); }

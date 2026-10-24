@@ -23,6 +23,8 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
     private final EditorChromeHost host = new EditorChromeHost();
     private EditorChromeShell shell;
     private StageplayChromeShell stageplayShell;
+    private StageplayFormView stageplayForm;
+    private boolean menuController;
     private Host engine;
     private boolean active;
     private boolean viewportOverridden;
@@ -37,6 +39,7 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
         host.init(framebufferScale);
         shell = new EditorChromeShell(host);
         stageplayShell = new StageplayChromeShell(host);
+        stageplayForm = new StageplayFormView(host);
     }
 
     @Override
@@ -45,6 +48,11 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
         if (!active && shell != null) shell.closeCommandPalette();
         if (!active && stageplayShell != null) stageplayShell.closeCommandPalette();
         return active;
+    }
+
+    @Override
+    public boolean handlesMenu(com.openggf.editor.project.EditorProjectMenu menu) {
+        return !menuController && (menu.formView() != null || menu.actionView()!=null) && !menu.capturesText() && !menu.showingDetails();
     }
 
     @Override
@@ -86,8 +94,13 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
         // editor tick, not after the frame's final display pass, so drawing only queues them.
         try {
             if (stageplayActive()) {
-                canvas = stageplayShell.draw(new StageplayChromeShell.Frame(engine.stageplay(), pending::addLast,
-                        game[0], game[1], game[2], game[3], game[4]));
+                boolean form = handlesMenu(engine.stageplay().menu());
+                imgui.ImGui.beginDisabled(form || engine.stageplay().pickingPosition());
+                try {
+                    canvas = stageplayShell.draw(new StageplayChromeShell.Frame(engine.stageplay(), pending::addLast,
+                            game[0], game[1], game[2], game[3], game[4]));
+                } finally { imgui.ImGui.endDisabled(); }
+                if (form) stageplayForm.draw(engine.stageplay().menu(), pending::addLast);
             } else {
                 var commands = new java.util.ArrayList<EditorCommandPalette.HostCommand>();
                 for (var command : engine.commands()) commands.add(new EditorCommandPalette.HostCommand(command.label(),
@@ -106,8 +119,12 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
     @Override
     public boolean update(InputHandler input) {
         boolean wasStageplay = stageplayActive();
+        boolean nativeForm = wasStageplay && handlesMenu(engine.stageplay().menu());
+        menuController = com.openggf.control.MenuInput.controller(input);
+        // Controller directing retains the shared HUD, including its field browser and mappings.
+        if (nativeForm && menuController) engine.stageplay().menu().update(input);
         while (!pending.isEmpty()) pending.removeFirst().run();
-        if (stageplayActive()) engine.stageplay().setCameraInputEnabled(!paletteOpen() && !host.wantsTextInput());
+        if (stageplayActive()) engine.stageplay().setCameraInputEnabled(!paletteOpen() && !host.wantsTextInput() && !engine.stageplay().menu().isOpen());
         // Consume the transition tick too: a click or held key cannot paint terrain on exit.
         return wasStageplay || stageplayActive() || paletteOpen();
     }
@@ -127,6 +144,7 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
 
     @Override
     public boolean mouseButton(int button, int action) {
+        if (action == GLFW.GLFW_PRESS) menuController = false;
         if (!active) return true;
         host.onMouseButton(button, action);
         // Releases always reach the engine so a stroke that started in the canvas can finish.
@@ -142,15 +160,28 @@ public final class ImGuiEditorChrome implements EditorWindowChrome {
 
     @Override
     public boolean key(int key, int action, int mods) {
+        if (action == GLFW.GLFW_PRESS) menuController = false;
         if (!active) return true;
         host.onKey(key, action, mods);
         StageplayWorkspace workspace = engine == null ? null : engine.stageplay();
+        if(workspace!=null&&workspace.pickingPosition())return action==GLFW.GLFW_RELEASE
+                ||key==GLFW.GLFW_KEY_LEFT||key==GLFW.GLFW_KEY_RIGHT||key==GLFW.GLFW_KEY_UP||key==GLFW.GLFW_KEY_DOWN
+                ||key==GLFW.GLFW_KEY_ENTER||key==GLFW.GLFW_KEY_ESCAPE||key==GLFW.GLFW_KEY_S||key==GLFW.GLFW_KEY_LEFT_SHIFT||key==GLFW.GLFW_KEY_RIGHT_SHIFT;
         if (workspace != null && key == GLFW.GLFW_KEY_F4 && action == GLFW.GLFW_PRESS) {
             pending.addLast(() -> {
                 if (workspace.active()) workspace.deactivate(); else workspace.activate();
                 if (shell != null) shell.closeCommandPalette();
                 if (stageplayShell != null) stageplayShell.closeCommandPalette();
             });
+            return false;
+        }
+        if (stageplayActive() && handlesMenu(workspace.menu())) {
+            if (action == GLFW.GLFW_PRESS) {
+                if (key == GLFW.GLFW_KEY_F1) stageplayForm.toggleHelp();
+                if (key == GLFW.GLFW_KEY_ESCAPE && !stageplayForm.closeHelp()) pending.addLast(workspace.menu()::close);
+                if (key == GLFW.GLFW_KEY_ENTER && workspace.menu().formView()!=null && !host.wantsTextInput()
+                        && (!host.isInitialized() || !imgui.ImGui.isAnyItemFocused())) pending.addLast(workspace.menu()::submit);
+            }
             return false;
         }
         if (stageplayActive()) return stageplayKey(workspace, key, action, mods);

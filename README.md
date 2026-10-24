@@ -71,6 +71,18 @@ work with the HUD controller keyboard.
 
 ## Stageplay
 
+Stageplay forms share the in-engine editor's short labels, grouped rows, named
+choices and collapsed **Advanced** settings. **F1 Help** keeps complete field
+ranges and diagnostics. The Direction panel puts actions first; hover its controls
+for help.
+
+Click **Pick** beside a level position to choose it on the canvas. Hover shows a
+yellow crosshair and coordinate tag; click confirms the form values, while drag or
+scroll pans across the level. **S** toggles floor snapping, **Enter** confirms and
+**Esc** cancels. Route destinations start with snapping on and a cyan marker shows
+the queried floor. Numeric inputs remain available. Picking changes the form;
+Apply performs the normal edit. Panel positions and relative offsets stay numeric.
+
 The File menu offers **Import screenplay** and **Export screenplay**, using the same
 shot-local version-seven format as the in-engine editor and terminal tool. Import
 creates an unsaved canonical scene; refine it, save `.stageplay`, then export and
@@ -86,14 +98,14 @@ choose **Move / jump / stop** or press **K**. A move specifies a destination and
 as a fraction of native maximum speed; the character tries to reach it through actual
 acceleration and collision. Jump uses the native jump and a chosen button hold. Stop
 brakes. The inspector shows actual position and moving, arrived or blocked state.
-Choose **Direct → Route helper** for bounded planning over the set's actual
+Choose **Direct → Plan route** for bounded planning over the set's actual
 collision terrain. Players start at shot entry; objects can also start at an
 existing visible Puppet key after explicit Free initialization. Playable routes emit native movement/jump/stop intents
 and require fresh cold LIVE replay before **VERIFIED**. The viewport shows the
 selected player's or walking object's simulated path before Apply: cyan grounded
 segments, gold airborne arcs and start/goal/failure markers. Route state, the legend
-and wrapped, plain-language failure explanations appear in the Direction inspector,
-with a short status line, leaving the picture clear of route text.
+and short result sentences appear in the Direction inspector. Full explanations
+remain in tooltips and F1 Help, leaving the picture clear of route text.
 Applied plans remain visible during authoring playback; a white cross marks the
 player's actual centre. The line follows camera zoom/pan and stays out of saved
 scenes, mod playback and exported films. Scene/root edits hide old plans; reopening

@@ -41,6 +41,45 @@ import static org.lwjgl.opengl.GL11.*;
  */
 class TestStageplayChromePictures {
     @Test
+    void captureReadabilityCheckpoint() throws Exception {
+        assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
+        assertEquals("surfaceless-egl", System.getProperty("openggf.headless.gl"));
+        try (var boot = new HeadlessGameBoot(1280,720,320,224,320,224)) {
+            boot.setBootToTitle(true); boot.boot(Path.of(System.getProperty("sonic2.rom.path")),0,0);
+            StageplayMenuSurvey.captureCheckpoint((name,workspace) -> {
+                try (var chrome = new ImGuiEditorChrome()) {
+                    chrome.init(new EditorWindowChrome.Host() {
+                        public LevelEditorController controller() { return new LevelEditorController(); }
+                        public void dispatch(EditorInputHandler.Action action) { fail("A form cannot dispatch terrain edits"); }
+                        public List<EditorCommandPalette.HostCommand> commands() { return List.of(); }
+                        public StageplayWorkspace stageplay() { return workspace; }
+                    }, 1);
+                    assertTrue(chrome.handlesMenu(workspace.menu()));
+                    assertTrue(chrome.setActive(true));
+                    for (int frame=0;frame<4;frame++) {
+                        glViewport(0,0,1280,720); glDisable(GL_SCISSOR_TEST);
+                        glClearColor(.025f,.04f,.075f,1); glClear(GL_COLOR_BUFFER_BIT);
+                        chrome.render(1280,720,1280,720);
+                    }
+                    capture(name,1280,720); assertEquals(GL_NO_ERROR,glGetError());
+                }
+            });
+        }
+    }
+
+    @Test
+    void captureCompleteMenuSurvey() throws Exception {
+        assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit menu survey only");
+        assertEquals("surfaceless-egl",System.getProperty("openggf.headless.gl"));
+        try(var boot=new HeadlessGameBoot(1280,720,320,224,320,224)) {
+            boot.setBootToTitle(true);boot.boot(Path.of(System.getProperty("sonic2.rom.path")),0,0);
+            try(var renderer=new EditorProjectMenuRenderer()) {
+                StageplayMenuSurvey.capture((name,workspace)->{ renderMenu(renderer,workspace,1280,720);capture(name,1280,720); });
+            } finally { com.openggf.game.session.EngineServices.current().graphics().cleanup(); }
+        }
+    }
+
+    @Test
     void captureCompactObjectVoiceForm() throws Exception {
         assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
         assertEquals("surfaceless-egl",System.getProperty("openggf.headless.gl"));
@@ -48,7 +87,7 @@ class TestStageplayChromePictures {
         try(var boot=new HeadlessGameBoot(1280,720,320,224,320,224)) {
             boot.setBootToTitle(true);boot.boot(rom,0,0);
             try(var renderer=new EditorProjectMenuRenderer()) {
-                var key=new StageplayDocument.ObjectKey(0,100,200,0,-1,false,true,StageplayDocument.Interpolation.HOLD,StageplayDocument.ObjectMode.POSE);
+                var key=new StageplayDocument.ObjectKey(0,100,200,0,-1,Facing.RIGHT,true,StageplayDocument.Interpolation.HOLD,StageplayDocument.ObjectMode.POSE);
                 var scene=StageplayDocument.empty("s2",0,0,0,500,320,224).withObjectActors(List.of(
                         new StageplayDocument.ObjectActor("moto","Motobug","s1",0,0,64,0,-1,List.of(key),List.of())));
                 var workspace=new StageplayWorkspace(()->scene);workspace.activate();workspace.selectActor("moto");
@@ -103,7 +142,7 @@ class TestStageplayChromePictures {
                 Path output = Path.of("target","stageplay-desktop").toAbsolutePath(); Files.createDirectories(output);
                 Path source = output.resolve("screenplay-source.json");
                 Files.writeString(source, """
-                        {"version":6,"name":"Two-way take","width":320,"height":224,
+                        {"version":7,"name":"Two-way take","width":320,"height":224,
                          "cast":[{"id":"hero","name":"Sonic","gameId":"s2","character":"sonic","puppet":false}],
                          "shots":[{"id":"opening","durationFrames":120,
                          "set":{"gameId":"s2","zone":0,"act":0},
@@ -253,24 +292,24 @@ class TestStageplayChromePictures {
                 workspace.invoke(StageplayWorkspace.Action.DIALOGUE);
                 choose(workspace,3); // Existing Sonic line, after Add / typers / decorations.
                 assertEquals("Sonic / dialogue",workspace.menu().title());
-                renderMenu(menuRenderer,workspace,1600,900);
+                renderMenu(chrome,workspace,1600,900);
                 capture("dialogue-line-menu",1600,900);
                 choose(workspace,0);
                 assertEquals("Dialogue line",workspace.menu().title());
                 assertEquals(scene.dialogue().getFirst().text(),workspace.menu().values().get("text"));
-                renderMenu(menuRenderer,workspace,1600,900);
+                renderMenu(chrome,workspace,1600,900);
                 capture("dialogue-line-form",1600,900);
 
                 workspace.menu().close();
                 workspace.invoke(StageplayWorkspace.Action.DIALOGUE_SKINS);
                 choose(workspace,1); // Existing warm decoration profile.
                 assertEquals("Decoration: warm",workspace.menu().title());
-                renderMenu(menuRenderer,workspace,1600,900);
+                renderMenu(chrome,workspace,1600,900);
                 capture("dialogue-decoration-menu",1600,900);
                 choose(workspace,0);
-                assertEquals("Decoration: warm",workspace.menu().title());
+                assertEquals("Dialogue style",workspace.menu().title());
                 assertEquals("FFFFCF66",workspace.menu().values().get("name"));
-                renderMenu(menuRenderer,workspace,1600,900);
+                renderMenu(chrome,workspace,1600,900);
                 capture("dialogue-decoration-form",1600,900);
                 workspace.menu().close();
                 assertEquals(scene,workspace.controller().document(),"Reviewing forms must not change the scene");
@@ -298,21 +337,21 @@ class TestStageplayChromePictures {
                 capture("physics-720p",1280,720);
                 chrome.setActive(false);
                 workspace.invoke(StageplayWorkspace.Action.SET_KEY);
-                renderMenu(menuRenderer,workspace,1600,900); capture("physics-actions",1600,900);
+                renderMenu(chrome,workspace,1600,900); capture("physics-actions",1600,900);
                 choose(workspace,0);
-                renderMenu(menuRenderer,workspace,1600,900); capture("physics-goal-form",1600,900);
+                renderMenu(chrome,workspace,1600,900); capture("physics-goal-form",1600,900);
                 workspace.menu().close();
                 assertEquals(GL_NO_ERROR, glGetError());
 
                 workspace.controller().replace(StageplayDocument.empty("s2",0,1,0,0,320,224));
                 workspace.invoke(StageplayWorkspace.Action.OBJECTS);
-                renderMenu(menuRenderer,workspace,1600,900); capture("object-cast-commands",1600,900);
+                renderMenu(chrome,workspace,1600,900); capture("object-cast-commands",1600,900);
                 choose(workspace,0);
                 workspace.menu().setValue("name","EHZ boss"); workspace.menu().setValue("object","86");
                 workspace.menu().submit(); assertNull(workspace.menu().error());
-                renderMenu(menuRenderer,workspace,1600,900); capture("object-arena-restriction",1600,900);
+                renderMenu(chrome,workspace,1600,900); capture("object-arena-restriction",1600,900);
                 choose(workspace,1); choose(workspace,0);
-                renderMenu(menuRenderer,workspace,1600,900); capture("object-mode-key",1600,900);
+                renderMenu(chrome,workspace,1600,900); capture("object-mode-key",1600,900);
             }
         }
     }
@@ -364,10 +403,10 @@ class TestStageplayChromePictures {
                 for(int i=0;i<4;i++) render(chrome,surface,scene,1600,900);
                 capture("live-air-traffic",1600,900);
                 chrome.setActive(false); workspace.invoke(StageplayWorkspace.Action.SET_KEY);
-                renderMenu(menuRenderer,workspace,1600,900); capture("live-actions",1600,900);
+                renderMenu(chrome,workspace,1600,900); capture("live-actions",1600,900);
                 workspace.menu().close();
                 workspace.invoke(StageplayWorkspace.Action.CAMERA_KEY);
-                renderMenu(menuRenderer,workspace,1600,900); capture("live-camera-follow",1600,900);
+                renderMenu(chrome,workspace,1600,900); capture("live-camera-follow",1600,900);
                 workspace.menu().close();
                 assertEquals(GL_NO_ERROR,glGetError());
             }
@@ -394,15 +433,33 @@ class TestStageplayChromePictures {
         chrome.render(width,height,width,height);
     }
 
+    private static void renderMenu(ImGuiEditorChrome chrome,StageplayWorkspace workspace,int width,int height) {
+        assertTrue(workspace.menu().isOpen());assertTrue(chrome.setActive(true));
+        for(int frame=0;frame<4;frame++) {
+            glViewport(0,0,width,height);glDisable(GL_SCISSOR_TEST);glClearColor(.025f,.04f,.075f,1);glClear(GL_COLOR_BUFFER_BIT);
+            chrome.render(width,height,width,height);
+        }
+    }
+
     private static void renderMenu(EditorProjectMenuRenderer renderer,StageplayWorkspace workspace,int width,int height) {
         assertTrue(workspace.menu().isOpen());
-        glViewport(0,0,width,height);
-        glDisable(GL_SCISSOR_TEST);
-        glClearColor(0,0,0,1);
-        glClear(GL_COLOR_BUFFER_BIT);
-        int[] fit=StageplayChromeShell.fitPreview(0,0,width,height,320,224);
-        glViewport(fit[0],height-fit[1]-fit[3],fit[2],fit[3]);
-        renderer.render(workspace.menu(),SceneSurface.projection(320,224),320);
+        try(var chrome=new ImGuiEditorChrome()) {
+            chrome.init(new EditorWindowChrome.Host(){
+                public LevelEditorController controller(){return new LevelEditorController();}
+                public void dispatch(EditorInputHandler.Action action){fail("Menu cannot edit terrain");}
+                public List<EditorCommandPalette.HostCommand> commands(){return List.of();}
+                public StageplayWorkspace stageplay(){return workspace;}
+            },1);
+            assertTrue(chrome.setActive(true));
+            for(int frame=0;frame<4;frame++){
+                glViewport(0,0,width,height);glDisable(GL_SCISSOR_TEST);glClearColor(.025f,.04f,.075f,1);glClear(GL_COLOR_BUFFER_BIT);
+                chrome.render(width,height,width,height);
+                if(!chrome.handlesMenu(workspace.menu())) {
+                    int w=Math.round(width*224f/height);glViewport(0,0,width,height);
+                    renderer.render(workspace.menu(),new org.joml.Matrix4f().ortho2D(0,w,0,224).get(new float[16]),w);
+                }
+            }
+        }
     }
 
     private static void choose(StageplayWorkspace workspace,int row) {

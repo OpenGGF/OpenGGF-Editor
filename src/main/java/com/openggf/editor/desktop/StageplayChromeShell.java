@@ -52,6 +52,7 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
     private boolean layoutBuilt;
     private boolean compactLayout;
     private boolean commandPalette;
+    private boolean pickerDragged;
     private boolean focusPalette;
     private int cuePage;
     private StageplayDocument rowDocument;
@@ -218,19 +219,19 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
 
     private void cast(Frame frame) {
         if (ImGui.begin(CAST)) {
-            ImGui.textDisabled("ACTORS");
+            ImGui.textColored(EditorChromeTheme.SELECTION, "Actors");
             ImGui.textDisabled(worldLabel(frame.workspace));
             ImGui.separator();
             if (ImGui.button("Add actor", -1, 0)) frame.invoke(Action.ADD_ACTOR);
-            if (ImGui.button("ROM object cast / clear", -1, 0)) frame.invoke(Action.OBJECTS);
+            if (ImGui.button("Object cast", -1, 0)) frame.invoke(Action.OBJECTS);
             var actors = frame.workspace.controller().document().actors();
-            if (actors.isEmpty()) ImGui.textWrapped("Cast a character, place its centre near the floor, then direct a destination or jump with K.");
+            if (actors.isEmpty()) ImGui.textDisabled("Add an actor to begin.");
             for (var actor : actors) {
                 ImGui.pushID(actor.id());
                 try {
                     if (ImGui.selectable(actor.name(), actor.id().equals(frame.workspace.controller().selectedActorId()))) frame.select(actor.id());
                     boolean physical = frame.workspace.controller().document().puppets().stream().anyMatch(p -> p.actorId().equals(actor.id()));
-                    ImGui.textDisabled(actor.gameId().toUpperCase(Locale.ROOT) + " / " + actor.character() + (physical ? " / Puppet" : " / Poser"));
+                    ImGui.textDisabled(gameName(actor.gameId()) + " / " + (physical ? "Puppet" : "Poser"));
                     ImGui.spacing();
                 } finally { ImGui.popID(); }
             }
@@ -238,94 +239,112 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
                 ImGui.pushID(actor.id());
                 try {
                     if (ImGui.selectable(actor.name(), actor.id().equals(frame.workspace.controller().selectedActorId()))) frame.select(actor.id());
-                    ImGui.textDisabled(actor.gameId().toUpperCase(Locale.ROOT) + " / Object");
+                    ImGui.textDisabled(gameName(actor.gameId()) + " / Object");
                 } finally { ImGui.popID(); }
             }
             ImGui.separator();
             if (ImGui.button("Scene and set", -1, 0)) frame.invoke(Action.SCENE);
             if (ImGui.button("Camera key", -1, 0)) frame.invoke(Action.CAMERA_KEY);
-            if (ImGui.button("Camera shake / quake", -1, 0)) frame.invoke(Action.CAMERA_EFFECTS);
-            if (ImGui.button("Scene changes / transitions", -1, 0)) frame.invoke(Action.SCENE_CHANGES);
-            if (ImGui.button("Film format presets", -1, 0)) frame.invoke(Action.FILM_FORMAT);
-            if (ImGui.button("Dialogue / speakers", -1, 0)) frame.invoke(Action.DIALOGUE);
+            if (ImGui.button("Camera shake", -1, 0)) frame.invoke(Action.CAMERA_EFFECTS);
+            if (ImGui.button("Scene changes", -1, 0)) frame.invoke(Action.SCENE_CHANGES);
+            if (ImGui.button("Film format", -1, 0)) frame.invoke(Action.FILM_FORMAT);
+            if (ImGui.button("Dialogue", -1, 0)) frame.invoke(Action.DIALOGUE);
             if (ImGui.button("Speaker voice", -1, 0)) frame.invoke(Action.SPEAKER_VOICE);
             if (ImGui.button("Caption", -1, 0)) frame.invoke(Action.CAPTION);
-            if (ImGui.button("Sound, music or voice", -1, 0)) frame.invoke(Action.AUDIO);
+            if (ImGui.button("Audio", -1, 0)) frame.invoke(Action.AUDIO);
         }
         ImGui.end();
+    }
+
+    private void heading(String title) {
+        ImGui.dummy(0, 12);
+        ImGui.pushFont(host.headingFont(), EditorChromeHost.HEADING_SIZE);
+        ImGui.textColored(EditorChromeTheme.SELECTION, title);
+        ImGui.popFont();
+    }
+
+    private static void hint(String text) { if (ImGui.isItemHovered()) ImGui.setTooltip(text); }
+
+    private static void swatch(String label, int rgb) {
+        ImGui.colorButton("##"+label, ((rgb>>16)&255)/255f, ((rgb>>8)&255)/255f, (rgb&255)/255f, 1, 0, 8, 8);
+        ImGui.sameLine(0, 4); ImGui.textDisabled(label);
     }
 
     private void inspector(Frame frame) {
         if (ImGui.begin(INSPECTOR)) {
             var route = frame.workspace.routeOverlay();
             if (route != null) {
-                ImGui.textColored(route.result().success() ? EditorChromeTheme.SELECTION : EditorChromeTheme.WARNING, route.title());
-                ImGui.textColored(color(com.openggf.stageplay.editor.StageplayRouteOverlay.GROUND), "Cyan: walk");
-                ImGui.sameLine();
-                ImGui.textColored(color(com.openggf.stageplay.editor.StageplayRouteOverlay.AIR), "Gold: air / takeoff");
-                ImGui.textWrapped("Square: start   Diamond: goal");
-                ImGui.textWrapped(route.applied() ? "White cross: actual position" : "Red cross: stopped attempt");
-                ImGui.spacing();
-                ImGui.textWrapped(route.motionSummary());
-                ImGui.textWrapped(route.reason());
-                ImGui.separator();
+                heading("Route");
+                StageplayFormView.statusLine(route.result().success() ? EditorChromeTheme.SAVED : EditorChromeTheme.WARNING,route.summary());
+                hint(route.reason()+"\n"+route.motionSummary());
+                swatch("Walk", com.openggf.stageplay.editor.StageplayRouteOverlay.GROUND); ImGui.sameLine();
+                swatch("Air", com.openggf.stageplay.editor.StageplayRouteOverlay.AIR);
+                hint("Square: start. Diamond: goal. Cross: stopped or actual position.");
             }
             var controller = frame.workspace.controller();
             var actor = controller.document().actors().stream()
                     .filter(value -> value.id().equals(controller.selectedActorId())).findFirst().orElse(null);
             if (frame.workspace.cameraMode()) {
                 var camera = frame.workspace.directorCamera();
-                ImGui.textColored(EditorChromeTheme.SELECTION, "CAMERA DIRECTION");
-                ImGui.text("Position: " + coordinate(camera.x()) + ", " + coordinate(camera.y()));
-                ImGui.text("Zoom: " + coordinate(camera.zoom()));
-                ImGui.textWrapped("WASD / arrows pan. Q / E zoom around the film centre. Shift moves faster. K captures framing; camera keys animate pans and zoom with their easing. Edit a key to follow one actor or frame a group.");
-                if (ImGui.button("Capture camera key  K", -1, 0)) frame.invoke(Action.SET_CAMERA_KEY);
-                if (ImGui.button("Edit / remove camera key", -1, 0)) frame.invoke(Action.CAMERA_KEY);
-                if (ImGui.button("Record camera take  R", -1, 0)) frame.invoke(Action.RECORD_CAMERA);
-                if (ImGui.button("Shake / quake effects", -1, 0)) frame.invoke(Action.CAMERA_EFFECTS);
-                ImGui.textWrapped("Framing is a preview until captured. Seeking discards unkeyed framing. Shake is layered over the base camera.");
+                heading("Camera direction");
+                ImGui.text("Position   " + coordinate(camera.x()) + ", " + coordinate(camera.y()));
+                ImGui.text("Zoom       " + coordinate(camera.zoom()));
+                hint("WASD / arrows pan. Q / E zoom. Shift moves faster. Capture saves framing; seeking discards unkeyed framing.");
+                if (ImGui.button("Capture key  K", -1, 0)) frame.invoke(Action.SET_CAMERA_KEY);
+                if (ImGui.button("Edit camera keys", -1, 0)) frame.invoke(Action.CAMERA_KEY);
+                hint("Camera keys animate pans and zoom; follow an actor or frame a group in Advanced.");
+                if (ImGui.button("Record camera  R", -1, 0)) frame.invoke(Action.RECORD_CAMERA);
+                if (ImGui.button("Camera shake", -1, 0)) frame.invoke(Action.CAMERA_EFFECTS);
+                hint("Shake is layered over the base camera.");
             } else if (actor == null) {
-                ImGui.textWrapped("Select an actor: Puppet directs native movement and jumps; Poser controls position, animation and frames.");
+                heading("Direction");
+                ImGui.textDisabled("Select an actor to direct.");
             } else {
-                ImGui.textColored(EditorChromeTheme.SELECTION, actor.name());
-                ImGui.textDisabled(actor.gameId() + " / " + actor.character());
-                ImGui.separator();
+                heading("Who"); ImGui.text(actor.name());
                 boolean physical = frame.workspace.selectedActorIsPuppet();
-                ImGui.textWrapped(frame.workspace.selectedActorStatus());
+                heading(physical ? "Puppet / native physics" : "Poser / position and pose");
+                hint("Puppet uses native movement and abilities. Poser uses position, animation and pose keys. Placement applies at shot boundaries.");
                 var world = frame.workspace.previewFrame().world();
-                if (world != null) world.actors().stream().filter(a -> a.actorId().equals(actor.id())).findFirst()
-                        .ifPresent(state -> ImGui.textWrapped(liveActorStatus(state)));
-                if (physical) {
-                    ImGui.textColored(EditorChromeTheme.SELECTION, "PUPPET / NATIVE PHYSICS");
-                    ImGui.textWrapped("Direct movement, jumps and native abilities. Target a placed object, or wait for contact, arrival or recovery. Goals can be blocked or time out.");
-                    ImGui.textWrapped("Placement applies at shot boundaries. Actor properties can disable floor snapping or choose Poser choreography.");
-                } else {
-                    ImGui.textColored(EditorChromeTheme.SELECTION, "POSER / POSITION AND POSE");
+                if (world != null) world.actors().stream().filter(a -> a.actorId().equals(actor.id())).findFirst().ifPresent(state -> {
+                    frame.workspace.previewFrame().actors().stream().filter(a->a.actorId().equals(actor.id())).findFirst().ifPresent(pose->
+                            ImGui.text("Position   "+coordinate(pose.x())+", "+coordinate(pose.y())));
+                    StageplayFormView.statusLine(state.dead()||state.hurt()?EditorChromeTheme.WARNING:EditorChromeTheme.SAVED,
+                            state.dead()?"Dead":state.hurt()?"Hurt":"Ready");
+                    hint(liveActorStatus(state)+"\n"+frame.workspace.selectedActorStatus());
+                });
+                if (!physical) {
                     StageplayDocument.ActorKey key = actor.keys().getFirst();
                     for (var candidate : actor.keys()) if (candidate.frame() <= controller.frame()) key = candidate; else break;
-                    ImGui.text("Latest key: frame " + key.frame());
-                    ImGui.text(key.pose() >= 0 ? "Fixed pose: " + key.pose() : "Animation: " + key.animation());
-                    ImGui.text("Facing: " + key.facing().name().toLowerCase(java.util.Locale.ROOT));
-                    ImGui.text("Visible: " + key.visible() + "  Scale: " + coordinate(key.scale()));
-                    ImGui.text("Transition: " + key.interpolation());
+                    ImGui.text("Key   " + key.frame() + " frames");
+                    ImGui.text(key.pose() >= 0 ? "Pose   " + key.pose() : "Animation   " + key.animation());
+                    hint("Facing: "+key.facing()+". Visible: "+key.visible()+". Scale: "+coordinate(key.scale())+". Easing: "+key.interpolation());
                 }
-                ImGui.spacing();
-                if (ImGui.button(physical ? "Direct native actions  K" : "Set / edit key at playhead", -1, 0)) frame.invoke(Action.SET_KEY);
-                if (ImGui.button(physical ? "Delete action at playhead" : "Delete key at playhead", -1, 0)) frame.invoke(Action.DELETE_KEY);
+                ImGui.dummy(0,20);
+                if (ImGui.button(physical ? "Direct actions  K" : "Set actor key  K", -1, 0)) frame.invoke(Action.SET_KEY);
+                hint("Move, jump or use an ability. Target objects and wait conditions are available in the action forms.");
+                if (ImGui.button("Place on floor", -1, 0)) frame.invoke(Action.PLACE_ON_FLOOR);
+                if (ImGui.button("Plan route", -1, 0)) frame.invoke(Action.ROUTE_HELPER);
                 if (ImGui.button("Actor properties", -1, 0)) frame.invoke(Action.EDIT_ACTOR);
+                heading("Edit");
+                if (ImGui.button(physical ? "Delete action" : "Delete key", -1, 0)) frame.invoke(Action.DELETE_KEY);
                 if (ImGui.button("Remove actor", -1, 0)) frame.invoke(Action.DELETE_ACTOR);
             }
-            ImGui.separator();
-            ImGui.textWrapped("Select a key or cue in the timeline to seek. Direction forms are shared with the in-engine editor.");
-            if (frame.workspace.recording()) ImGui.textColored(EditorChromeTheme.WARNING,
-                    frame.workspace.recordingCamera() ? "Camera take: pan / zoom / Space stop"
-                            : frame.workspace.recordingPuppet() ? "Puppet take: A/D move, W jump, release/S brake, Space end"
-                            : "Poser take: WASD move / Space stop");
+            heading("Details");
+            if (ImGui.button("Direction help", -1, 0)) frame.invoke(Action.DETAILS);
+            hint("Select timeline keys or cues to seek. All forms are shared with the in-engine editor.");
+            if (frame.workspace.recording()) StageplayFormView.statusLine(EditorChromeTheme.WARNING, "Recording · Space Stop");
         }
         ImGui.end();
     }
 
-    private static String coordinate(double value) { return String.format(Locale.ROOT, "%.2f", value); }
+    private static String friendly(String text) {
+        return java.util.regex.Pattern.compile("\\b[A-Z][A-Z_]{2,}\\b").matcher(text).replaceAll(m -> java.util.Arrays.stream(m.group().split("_"))
+                .map(w -> w.charAt(0)+w.substring(1).toLowerCase(Locale.ROOT)).collect(java.util.stream.Collectors.joining(" ")));
+    }
+
+    private static String coordinate(double value) { return java.math.BigDecimal.valueOf(value).setScale(2,java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString(); }
+
+    private static String gameName(String game) { return switch(game){case "s1"->"Sonic 1";case "s2"->"Sonic 2";case "s3k"->"Sonic 3 & K";default->game;}; }
 
     static String worldLabel(StageplayWorkspace workspace) {
         return "Native world / objects and rings";
@@ -387,7 +406,7 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
             if (ImGui.beginChild("##stageplayKeys", 0, 0, false)) {
                 for (int index = cuePage * ROW_PAGE_SIZE; index < Math.min(rows.size(), (cuePage + 1) * ROW_PAGE_SIZE); index++) {
                     CueRow row = rows.get(index);
-                    String label = row.frame() + "   " + row.track() + "   " + row.detail() + "##stageplayCue" + index;
+                    String label = row.frame() + "   " + friendly(row.track()) + "   " + friendly(row.detail()) + "##stageplayCue" + index;
                     if (ImGui.selectable(label, controller.frame() == row.frame()
                             && (row.actorId().isEmpty() || controller.selectedActorId().equals(row.actorId())))) {
                         if (!row.actorId().isEmpty()) frame.select(row.actorId());
@@ -441,6 +460,36 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
             try { frame.workspace.paintRouteOverlay(this, gx, gy, frame.gameWidth, frame.gameHeight); }
             finally { draw.popClipRect(); }
         }
+        if (frame.workspace.pickingPosition()) {
+            var picker=frame.workspace.positionPicker();
+            var view=frame.workspace.previewFrame().camera();
+            double scaleX=frame.gameWidth/(double)frame.workspace.controller().document().width()*view.zoom();
+            double scaleY=frame.gameHeight/(double)frame.workspace.controller().document().height()*view.zoom();
+            float mx=ImGui.getMousePosX(),my=ImGui.getMousePosY();
+            boolean hover=mx>=gx&&mx<gr&&my>=gy&&my<gb;
+            if(hover){
+                boolean dragging=ImGui.isMouseDragging(0)||ImGui.isMouseDragging(1)||ImGui.isMouseDragging(2);
+                if(dragging){
+                    pickerDragged=true;
+                    double dx=-ImGui.getIO().getMouseDeltaX()/scaleX,dy=-ImGui.getIO().getMouseDeltaY()/scaleY;
+                    frame.queue.accept(()->frame.workspace.panPicker(dx,dy));
+                } else {
+                    double px=view.x()+(mx-gx)/scaleX,py=view.y()+(my-gy)/scaleY;
+                    frame.queue.accept(()->frame.workspace.pickPoint(Math.round(px),Math.round(py)));
+                }
+                float wheel=ImGui.getIO().getMouseWheel(),across=ImGui.getIO().getMouseWheelH();
+                if(wheel!=0||across!=0)frame.queue.accept(()->frame.workspace.panPicker(across*48/view.zoom(),-wheel*48/view.zoom()));
+                if(ImGui.isMouseReleased(0)&&!pickerDragged)frame.queue.accept(frame.workspace::confirmPositionPick);
+            }
+            if(!ImGui.isMouseDown(0)&&!ImGui.isMouseDown(1)&&!ImGui.isMouseDown(2))pickerDragged=false;
+            draw.pushClipRect(gx,gy,gr,gb,true);
+            try {frame.workspace.paintPositionPicker(new com.openggf.editor.stageplay.StageplayPositionPicker.Painter(){
+                public void line(float x1,float y1,float x2,float y2,int rgb,float thickness){draw.addLine(x1,y1,x2,y2,color(rgb),thickness);}
+                public void rect(float x,float y,float w,float h,int rgb){draw.addRectFilled(x,y,x+w,y+h,color(rgb));}
+                public void text(String text,float x,float y,int rgb){draw.addText(x,y,color(rgb),text);}
+                public float textWidth(String text){return ImGui.calcTextSizeX(text);}
+            },gx,gy,frame.gameWidth,frame.gameHeight);}finally{draw.popClipRect();}
+        }
         draw.addRect(gx - 1, gy - 1, gr + 1, gb + 1, EditorChromeTheme.GRID_LINE);
         draw.addText(gx, gb + 5, EditorChromeTheme.TEXT_DIM, "Stage preview / "
                 + (frame.gameScale == 0 ? "fit" : frame.gameScale + "x") + " / frame " + frame.workspace.controller().frame());
@@ -452,7 +501,9 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
         if (ImGui.begin("##stageplayStatus", FIXED_WINDOW)) {
             String path = frame.workspace.path() == null ? "Unsaved scene" : frame.workspace.path().getFileName().toString();
             var route = frame.workspace.routeOverlay();
-            ImGui.textDisabled(path + "   /   " + (route == null ? frame.workspace.status() : route.statusText()));
+            if(frame.workspace.pickingPosition())ImGui.textColored(EditorChromeTheme.SELECTION,"Pick position · Drag / wheel Pan · S Snap · Enter Pick · Esc Cancel");
+            else {ImGui.textDisabled(path + "   /");ImGui.sameLine();StageplayFormView.statusLine(EditorChromeTheme.TEXT_DIM,route == null ? frame.workspace.statusSummary() : route.summary());
+                hint(frame.workspace.status());}
         }
         ImGui.end();
     }
