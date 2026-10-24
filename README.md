@@ -209,8 +209,13 @@ a speaking actor offers to retain named offscreen speech or remove their lines.
 
 Stageplay's **Speaker voice** button edits the selected player or ROM object in a
 compact shared form: tone/off, word/letter rhythm, pitch, variation, length and level.
-The same control is available from a dialogue line. `DEFAULT` restores the character
-voice. Genesis PSG blips follow the text reveal in preview and export; scrubbing is
+The same control is available from a dialogue line. Choose `PRESETS` in Tone to copy
+any of the fifteen audition voices, then adjust and Apply. `DEFAULT` restores the
+selected character voice: Sonic **Soft Cool**, Tails **Workshop**, Knuckles **Red Rattle**,
+S1 Motobug **Patrol Buzz**, and S1 Buzz Bomber **Wing Chime**. Blue Spark, Twin Chime,
+Stone Hollow and every other audition choice remain available as named presets.
+Saved explicit overrides retain their settings. Genesis PSG blips follow the text
+reveal in preview and export; scrubbing is
 silent. Object cast members can be named dialogue speakers with pointers following
 their native positions. Voice edits share Undo/Redo, scene saving and screenplay
 import/export with the built-in editor. Disable speech noises when an imported voice

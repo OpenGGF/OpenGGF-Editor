@@ -33,6 +33,14 @@ class TestStageplayChrome {
         assertFalse(workspace.menu().isOpen()); queue.removeFirst().run();
         assertTrue(workspace.menu().title().contains("voice"));
         assertEquals(6, workspace.menu().values().size(), "One compact shared form");
+        assertEquals("HOLLOW",workspace.menu().values().get("tone"));
+        assertEquals("67",workspace.menu().values().get("pitch"));
+        workspace.menu().setValue("tone","PRESETS");assertEquals("Voice presets",workspace.menu().title());choose(workspace,0);
+        workspace.menu().submit();assertNull(workspace.menu().error());
+        assertEquals(StageplayDocument.VoiceTone.SQUARE,workspace.controller().document().voices().getFirst().tone());
+        assertEquals(72,workspace.controller().document().voices().getFirst().pitch());
+        frame.invoke(StageplayWorkspace.Action.UNDO);queue.removeFirst().run();assertEquals(before,workspace.controller().document());
+        frame.invoke(StageplayWorkspace.Action.SPEAKER_VOICE);queue.removeFirst().run();
         workspace.menu().setValue("tone","OFF"); workspace.menu().submit();
         assertNull(workspace.menu().error());
         assertEquals(StageplayDocument.VoiceTone.OFF, workspace.controller().document().voices().getFirst().tone());
