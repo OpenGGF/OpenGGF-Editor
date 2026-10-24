@@ -24,6 +24,33 @@ import static org.lwjgl.glfw.GLFW.*;
 /** Desktop input and commands use the same authoring objects as the built-in HUD. */
 class TestStageplayChrome {
     @Test
+    void desktopVoiceFormUsesSharedCastSelectionAndUndo() {
+        var workspace = workspace(); workspace.activate();
+        var queue = new ArrayDeque<Runnable>();
+        var frame = new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
+        frame.invoke(StageplayWorkspace.Action.ADD_ACTOR); queue.removeFirst().run();
+        workspace.menu().setValue("mode","POSER"); workspace.menu().submit();
+        var before = workspace.controller().document();
+        frame.invoke(StageplayWorkspace.Action.SPEAKER_VOICE);
+        assertFalse(workspace.menu().isOpen()); queue.removeFirst().run();
+        assertTrue(workspace.menu().title().contains("voice"));
+        assertEquals(6, workspace.menu().values().size(), "One compact shared form");
+        assertEquals("HOLLOW",workspace.menu().values().get("tone"));
+        assertEquals("67",workspace.menu().values().get("pitch"));
+        workspace.menu().setValue("tone","PRESETS");assertEquals("Voice presets",workspace.menu().title());choose(workspace,0);
+        workspace.menu().submit();assertNull(workspace.menu().error());
+        assertEquals(StageplayDocument.VoiceTone.SQUARE,workspace.controller().document().voices().getFirst().tone());
+        assertEquals(72,workspace.controller().document().voices().getFirst().pitch());
+        frame.invoke(StageplayWorkspace.Action.UNDO);queue.removeFirst().run();assertEquals(before,workspace.controller().document());
+        frame.invoke(StageplayWorkspace.Action.SPEAKER_VOICE);queue.removeFirst().run();
+        workspace.menu().setValue("tone","OFF"); workspace.menu().submit();
+        assertNull(workspace.menu().error());
+        assertEquals(StageplayDocument.VoiceTone.OFF, workspace.controller().document().voices().getFirst().tone());
+        frame.invoke(StageplayWorkspace.Action.UNDO); queue.removeFirst().run();
+        assertEquals(before, workspace.controller().document());
+    }
+
+    @Test
     void routeHelperQueuesTheSharedRequestAndCancellationWithoutEditingTheScene() {
         var request=new java.util.concurrent.atomic.AtomicReference<com.openggf.stageplay.route.StageplayRouteRequest>();
         var cancelled=new java.util.concurrent.atomic.AtomicInteger();

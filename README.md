@@ -204,9 +204,24 @@ stretching edges and the centre; optional portrait PNGs belong to individual lin
 Use **Custom reveal timing** for exact character timing, with offsets measured from
 the line's start; combining characters stay together. Long schedules are split into
 editable groups and preserved when other fields change. **Use typer timing** restores
-the reusable rhythm. Typing itself is silent; use an audio cue for a voice or sound.
+the reusable rhythm. Seeking is silent; forward playback uses the speaker voice.
+Audio cues add imported performances or sound effects.
 Deleting a profile returns its lines to the built-in default in one undo step. Removing
 a speaking actor offers to retain named offscreen speech or remove their lines.
+
+Stageplay's **Speaker voice** button edits the selected player or ROM object in a
+compact shared form: tone/off, word/letter rhythm, pitch, variation, length and level.
+The same control is available from a dialogue line. Choose `PRESETS` in Tone to copy
+any of the fifteen audition voices, then adjust and Apply. `DEFAULT` restores the
+selected character voice: Sonic **Soft Cool**, Tails **Workshop**, Knuckles **Red Rattle**,
+S1 Motobug **Patrol Buzz**, and S1 Buzz Bomber **Wing Chime**. Blue Spark, Twin Chime,
+Stone Hollow and every other audition choice remain available as named presets.
+Saved explicit overrides retain their settings. Genesis PSG blips follow the text
+reveal in preview and export; scrubbing is
+silent. Object cast members can be named dialogue speakers with pointers following
+their native positions. Voice edits share Undo/Redo, scene saving and screenplay
+import/export with the built-in editor. Disable speech noises when an imported voice
+recording should stand alone.
 
 Windowed authoring requests a temporary 16:9 window of at least **1280 × 720**, reduced
 to fit smaller screens. Leaving Stageplay restores the previous window size and removes
@@ -264,6 +279,7 @@ or start from a directory where OpenGGF is already configured. At the title scre
 **Tools → Editor projects** to create, open or import a level. This desktop provider
 replaces the engine's built-in controller HUD. To use that HUD, run OpenGGF without
 the desktop editor on its class path.
+
 
 ## Offscreen visual checks
 
