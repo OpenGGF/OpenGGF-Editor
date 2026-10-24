@@ -128,7 +128,7 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
             if (ImGui.beginMenu("Direct")) {
                 try {
                     for (Action action : List.of(Action.ADD_ACTOR, Action.EDIT_ACTOR, Action.DELETE_ACTOR,
-                            Action.SET_KEY, Action.PUPPET_ACTIONS, Action.ROUTE_HELPER, Action.OBJECTS, Action.DELETE_KEY, Action.CAMERA_MODE, Action.SET_CAMERA_KEY, Action.CAMERA_KEY,
+                            Action.SET_KEY, Action.PUPPET_ACTIONS, Action.PLACE_ON_FLOOR, Action.ROUTE_HELPER, Action.OBJECTS, Action.DELETE_KEY, Action.CAMERA_MODE, Action.SET_CAMERA_KEY, Action.CAMERA_KEY,
                             Action.RECORD_CAMERA, Action.CAMERA_EFFECTS, Action.SCENE_CHANGES, Action.CAPTION, Action.DIALOGUE, Action.DIALOGUE_TYPERS, Action.DIALOGUE_SKINS, Action.AUDIO, Action.RECORD))
                         menuItem(frame, action, "");
                 } finally { ImGui.endMenu(); }
