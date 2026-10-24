@@ -79,8 +79,8 @@ for help.
 Click **Pick** beside a level position to choose it on the canvas. Hover shows a
 yellow crosshair and coordinate tag; click confirms the form values, while drag or
 scroll pans across the level. **S** toggles floor snapping, **Enter** confirms and
-**Esc** cancels. Route destinations start with snapping on and a cyan marker shows
-the queried floor. Numeric inputs remain available. Picking changes the form;
+**Esc** cancels. Route destinations start with snapping on; a yellow floor line and
+dashed vertical guide mark the queried floor. Numeric inputs remain available. Picking changes the form;
 Apply performs the normal edit. Panel positions and relative offsets stay numeric.
 
 The File menu offers **Import screenplay** and **Export screenplay**, using the same
