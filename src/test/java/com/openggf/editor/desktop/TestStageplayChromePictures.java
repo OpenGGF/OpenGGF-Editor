@@ -56,7 +56,7 @@ class TestStageplayChromePictures {
                 frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);queue.removeFirst().run();
                 workspace.menu().setValue("x","240");workspace.menu().setValue("y","648");
                 renderMenu(renderer,workspace,1600,900);capture("route-player-form",1600,900);
-                workspace.menu().close();frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);queue.removeFirst().run();workspace.menu().setValue("actor","prop");
+                workspace.menu().close();workspace.selectActor("prop");frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);queue.removeFirst().run();
                 workspace.menu().setValue("halfWidth","12");workspace.menu().setValue("height","24");workspace.menu().setValue("footOffset","12");
                 var input=new InputHandler();for(int i=0;i<12;i++)press(workspace,input,GLFW_KEY_DOWN);
                 renderMenu(renderer,workspace,1600,900);capture("route-object-footprint-form",1600,900);
