@@ -149,7 +149,7 @@ class TestStageplayChromePictures {
                          "camera":[{"frame":0,"x":0,"y":500}],"actors":{"hero":[
                          {"frame":0,"x":128,"y":648,"animation":5},{"frame":30,"x":128,"y":648,"animation":5},
                          {"frame":90,"x":256,"y":648,"animation":5},{"frame":119,"x":256,"y":648,"animation":5}]},
-                         "audio":[{"frame":0,"kind":"ROM_MUSIC","gameId":"s2","soundId":129}]}]}
+                         "audio":[{"frame":0,"kind":"ROM_MUSIC","gameId":"s2","soundId":130}]}]}
                         """);
                 var workspace = workspaceForScreenplay(); workspace.activate();
                 var queue = new java.util.ArrayDeque<Runnable>();
@@ -233,7 +233,7 @@ class TestStageplayChromePictures {
                         .withSceneChanges(List.of(new StageplayDocument.SceneChange("next-shot",240,
                                 new StageplayDocument.SetSource("s2",0,1,"",""),StageplayDocument.Transition.FADE_BLACK,30)))
                         .withCaptions(List.of(new StageplayDocument.Caption("greeting", 0, 180, "Ready for another adventure?", 12, 190, -1)))
-                        .withAudio(List.of(new StageplayDocument.AudioCue("music", 0, StageplayDocument.AudioKind.ROM_MUSIC, "s2", 129, "", 1)))
+                        .withAudio(List.of(new StageplayDocument.AudioCue("music", 0, StageplayDocument.AudioKind.ROM_MUSIC, "s2", 130, "", 1)))
                         .withDialogueTypers(List.of(new StageplayDocument.DialogueTyper("conversation",3,8,0)))
                         .withDialogueSkins(List.of(new StageplayDocument.DialogueSkin("warm",0xfff5f0df,0xffffcf66,
                                 0xff172338,0xffa8b8cf,6,"",0,true)))
@@ -289,6 +289,17 @@ class TestStageplayChromePictures {
 
                 // The production host disables desktop chrome while the shared native modal owns input.
                 chrome.setActive(false);
+                workspace.invoke(StageplayWorkspace.Action.AUDIO);
+                choose(workspace,1); choose(workspace,0); // Existing music cue, then Edit.
+                assertEquals("130",workspace.menu().values().get("sound"));
+                var sound = workspace.menu().formView().groups().stream().flatMap(g -> g.fields().stream())
+                        .filter(field -> field.field().key().equals("sound")).findFirst().orElseThrow();
+                assertTrue(sound.display().contains("Emerald Hill"),sound.display());
+                assertTrue(sound.display().contains("$82"),sound.display());
+                assertTrue(sound.optionLabels().size() > 4,"Native desktop combo keeps the complete named catalog");
+                renderMenu(chrome,workspace,1600,900);
+                capture("dayoff-audio",1600,900);
+                workspace.menu().close();
                 workspace.invoke(StageplayWorkspace.Action.DIALOGUE);
                 choose(workspace,3); // Existing Sonic line, after Add / typers / decorations.
                 assertEquals("Sonic / dialogue",workspace.menu().title());
