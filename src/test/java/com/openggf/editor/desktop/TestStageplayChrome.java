@@ -39,6 +39,8 @@ class TestStageplayChrome {
         assertFalse(chrome.key(GLFW_KEY_ESCAPE,GLFW_PRESS,0));
         assertTrue(workspace.menu().isOpen());chrome.update(new InputHandler());assertFalse(workspace.menu().isOpen());
         workspace.invoke(StageplayWorkspace.Action.CAPTION);assertTrue(chrome.handlesMenu(workspace.menu()),"Every shared Stageplay menu has a native view");
+        workspace.menu().openDetails();assertFalse(chrome.handlesMenu(workspace.menu()),"Shared F1 help owns its renderer and input");
+        workspace.menu().close();
         workspace.invoke(StageplayWorkspace.Action.DIALOGUE);choose(workspace,0);choose(workspace,0);
         assertTrue(chrome.handlesMenu(workspace.menu()));workspace.menu().editField("portrait");
         assertFalse(chrome.handlesMenu(workspace.menu()),"The shared path browser remains reachable");

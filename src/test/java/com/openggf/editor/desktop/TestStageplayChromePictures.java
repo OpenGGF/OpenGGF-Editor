@@ -299,6 +299,12 @@ class TestStageplayChromePictures {
                 assertTrue(sound.optionLabels().size() > 4,"Native desktop combo keeps the complete named catalog");
                 renderMenu(chrome,workspace,1600,900);
                 capture("dayoff-audio",1600,900);
+                workspace.menu().openDetails();
+                assertFalse(chrome.handlesMenu(workspace.menu()),"F1 uses the shared compact details renderer");
+                renderMenu(chrome,workspace,1600,900);
+                int detailsWidth=Math.round(1600*224f/900);
+                menuRenderer.render(workspace.menu(),new org.joml.Matrix4f().ortho2D(0,detailsWidth,0,224).get(new float[16]),detailsWidth);
+                capture("dayoff-audio-details",1600,900);
                 workspace.menu().close();
                 workspace.invoke(StageplayWorkspace.Action.DIALOGUE);
                 choose(workspace,3); // Existing Sonic line, after Add / typers / decorations.
