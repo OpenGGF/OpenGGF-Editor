@@ -1,5 +1,7 @@
 package com.openggf.editor.desktop;
 
+import com.openggf.stageplay.StageplayDocument.Facing;
+
 import com.openggf.control.InputHandler;
 import com.openggf.data.RomManager;
 import com.openggf.editor.EditorCommandPalette;
@@ -47,10 +49,10 @@ class TestStageplayChromePictures {
             boot.setBootToTitle(true);boot.boot(rom,0,0);
             try (var renderer=new EditorProjectMenuRenderer()) {
                 var scene=StageplayDocument.empty("s2",0,0,0,500,320,224).withActors(List.of(
-                        new StageplayDocument.Actor("hero","Sonic","s2","sonic",List.of(new StageplayDocument.ActorKey(0,128,648,0,-1,false,true,1,StageplayDocument.Interpolation.HOLD)))))
+                        new StageplayDocument.Actor("hero","Sonic","s2","sonic",List.of(new StageplayDocument.ActorKey(0,128,648,0,-1,Facing.RIGHT,true,1,StageplayDocument.Interpolation.HOLD)))))
                         .withPuppets(List.of(new StageplayDocument.PuppetTrack("hero",true,0,List.of())))
                         .withObjectActors(List.of(new StageplayDocument.ObjectActor("prop","Walking prop","s2",0,0,65,0,-1,
-                                List.of(new StageplayDocument.ObjectKey(0,128,648,0,-1,false,true,StageplayDocument.Interpolation.HOLD,StageplayDocument.ObjectMode.PUPPET)),List.of())));
+                                List.of(new StageplayDocument.ObjectKey(0,128,648,0,-1,Facing.RIGHT,true,StageplayDocument.Interpolation.HOLD,StageplayDocument.ObjectMode.PUPPET)),List.of())));
                 var workspace=new StageplayWorkspace(() -> scene);workspace.activate();workspace.selectActor("hero");
                 var queue=new java.util.ArrayDeque<Runnable>();var frame=new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
                 frame.invoke(StageplayWorkspace.Action.ROUTE_HELPER);queue.removeFirst().run();
@@ -355,7 +357,7 @@ class TestStageplayChromePictures {
 
     private static StageplayDocument.ActorKey key(int frame, double x, double y, int pose) {
         // S2 mapping frame zero is empty. WAIT (5) resolves the shipped standing frames.
-        return new StageplayDocument.ActorKey(frame, x, y, 5, pose, false, true, 1, StageplayDocument.Interpolation.LINEAR);
+        return new StageplayDocument.ActorKey(frame, x, y, 5, pose, Facing.RIGHT, true, 1, StageplayDocument.Interpolation.LINEAR);
     }
 
     private static void render(ImGuiEditorChrome chrome, SceneSurface surface,StageplayDocument scene,int width,int height) {

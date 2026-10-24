@@ -304,7 +304,7 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
                     for (var candidate : actor.keys()) if (candidate.frame() <= controller.frame()) key = candidate; else break;
                     ImGui.text("Latest key: frame " + key.frame());
                     ImGui.text(key.pose() >= 0 ? "Fixed pose: " + key.pose() : "Animation: " + key.animation());
-                    ImGui.text("Facing: " + (key.flipX() ? "left" : "right"));
+                    ImGui.text("Facing: " + key.facing().name().toLowerCase(java.util.Locale.ROOT));
                     ImGui.text("Visible: " + key.visible() + "  Scale: " + coordinate(key.scale()));
                     ImGui.text("Transition: " + key.interpolation());
                 }

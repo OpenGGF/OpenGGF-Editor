@@ -1,5 +1,7 @@
 package com.openggf.editor.desktop;
 
+import com.openggf.stageplay.StageplayDocument.Facing;
+
 import com.openggf.control.InputHandler;
 import com.openggf.editor.EditorCommandPalette;
 import com.openggf.editor.EditorInputHandler;
@@ -26,7 +28,7 @@ class TestStageplayChrome {
         var request=new java.util.concurrent.atomic.AtomicReference<com.openggf.stageplay.route.StageplayRouteRequest>();
         var cancelled=new java.util.concurrent.atomic.AtomicInteger();
         var scene=StageplayDocument.empty("s2",0,0,0,500,320,224).withActors(List.of(
-                new StageplayDocument.Actor("hero","Sonic","s2","sonic",List.of(new StageplayDocument.ActorKey(0,128,648,0,-1,false,true,1,StageplayDocument.Interpolation.HOLD)))))
+                new StageplayDocument.Actor("hero","Sonic","s2","sonic",List.of(new StageplayDocument.ActorKey(0,128,648,0,-1,Facing.RIGHT,true,1,StageplayDocument.Interpolation.HOLD)))))
                 .withPuppets(List.of(new StageplayDocument.PuppetTrack("hero",true,0,List.of())));
         var workspace=new StageplayWorkspace(new StageplayWorkspace.Host(){
             public StageplayDocument initialDocument(){return scene;}
@@ -206,7 +208,7 @@ class TestStageplayChrome {
                 .withCaptions(List.of(new StageplayDocument.Caption("line", 20, 50, "Hello", 5, 10, -1)))
                 .withAudio(List.of(new StageplayDocument.AudioCue("sound", 10, StageplayDocument.AudioKind.ROM_SFX, "s2", 1, "", 1)))
                 .withActors(List.of(new StageplayDocument.Actor("hero", "Hero", "s2", "sonic", List.of(
-                        new StageplayDocument.ActorKey(0, 100, 100, 0, -1, false, true, 1, StageplayDocument.Interpolation.HOLD)))));
+                        new StageplayDocument.ActorKey(0, 100, 100, 0, -1, Facing.RIGHT, true, 1, StageplayDocument.Interpolation.HOLD)))));
         var shell = new StageplayChromeShell(new EditorChromeHost());
         var rows = shell.cueRows(document);
         assertEquals(List.of(0, 0, 10, 20), rows.stream().map(StageplayChromeShell.CueRow::frame).toList());

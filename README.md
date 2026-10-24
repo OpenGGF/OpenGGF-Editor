@@ -72,7 +72,7 @@ work with the HUD controller keyboard.
 ## Stageplay
 
 The File menu offers **Import screenplay** and **Export screenplay**, using the same
-shot-local version-six format as the in-engine editor and terminal tool. Import
+shot-local version-seven format as the in-engine editor and terminal tool. Import
 creates an unsaved canonical scene; refine it, save `.stageplay`, then export and
 recompile without losing supported data. Export preserves save state, undo history
 and pending authored takes. Choose a new output filename; relative assets require
@@ -107,7 +107,9 @@ actors or replacing the current preview.
 The **Direct** menu also exposes camera keys, shake/quake effects, scene changes,
 dialogue, captions and audio cues. Property
 forms use the engine's keyboard, mouse and controller controls; choose a field, edit
-it, then use the form's final action to apply the change.
+it, then use the form's final action to apply the change. Player and directed-object
+keys use the same **Facing: Left / Right** choice. Native turns, skids and look-back
+poses keep their original art.
 
 Every shot uses one native world for level objects, rings, hazards and
 independently directed characters. The
