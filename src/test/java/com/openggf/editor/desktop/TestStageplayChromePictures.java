@@ -48,7 +48,7 @@ class TestStageplayChromePictures {
         try(var boot=new HeadlessGameBoot(1280,720,320,224,320,224)) {
             boot.setBootToTitle(true);boot.boot(rom,0,0);
             try(var renderer=new EditorProjectMenuRenderer()) {
-                var key=new StageplayDocument.ObjectKey(0,100,200,0,-1,false,true,StageplayDocument.Interpolation.HOLD,StageplayDocument.ObjectMode.POSE);
+                var key=new StageplayDocument.ObjectKey(0,100,200,0,-1,Facing.LEFT,true,StageplayDocument.Interpolation.HOLD,StageplayDocument.ObjectMode.POSE);
                 var scene=StageplayDocument.empty("s2",0,0,0,500,320,224).withObjectActors(List.of(
                         new StageplayDocument.ObjectActor("moto","Motobug","s1",0,0,64,0,-1,List.of(key),List.of())));
                 var workspace=new StageplayWorkspace(()->scene);workspace.activate();workspace.selectActor("moto");
@@ -103,7 +103,7 @@ class TestStageplayChromePictures {
                 Path output = Path.of("target","stageplay-desktop").toAbsolutePath(); Files.createDirectories(output);
                 Path source = output.resolve("screenplay-source.json");
                 Files.writeString(source, """
-                        {"version":6,"name":"Two-way take","width":320,"height":224,
+                        {"version":7,"name":"Two-way take","width":320,"height":224,
                          "cast":[{"id":"hero","name":"Sonic","gameId":"s2","character":"sonic","puppet":false}],
                          "shots":[{"id":"opening","durationFrames":120,
                          "set":{"gameId":"s2","zone":0,"act":0},
