@@ -58,13 +58,22 @@ public final class EditorChromeShell implements AutoCloseable {
 
     private final EditorChromeHost host;
     private final EditorTileAtlas atlas = new EditorTileAtlas();
+    private final EditorTileAtlas ghostAtlas = new EditorTileAtlas();
+    private final com.openggf.editor.render.EditorObjectPreviewCache objectArt = new com.openggf.editor.render.EditorObjectPreviewCache();
+    private boolean showInternalObjects;
+    private String revealedObjectSelection;
+    private float libraryRight, inspectorLeft;
+
     private final ImString filter = new ImString(32);
     private final ImString commandFilter = new ImString(64);
     private final float[] thumbnailSize = {64f};
+    private java.util.function.Consumer<Runnable> edits = Runnable::run;
+    public void setEditDispatcher(java.util.function.Consumer<Runnable> dispatcher) { edits = java.util.Objects.requireNonNull(dispatcher); }
     private boolean layoutBuilt;
     private boolean commandPaletteFocus;
     private boolean commandPaletteOpen;
     private int patternPaletteLine;
+    private int paletteEditLine = 1, paletteEditColor;
     private Area canvas = new Area(0, 0, 1, 1);
 
     public EditorChromeShell(EditorChromeHost host) {
@@ -77,6 +86,7 @@ public final class EditorChromeShell implements AutoCloseable {
         Integer patternRaw = controller.selectedPatternRaw();
         if (patternRaw != null) patternPaletteLine = (patternRaw >> 13) & 3;
         atlas.refresh(level, patternPaletteLine);
+        objectArt.refresh(level, controller.objectPaletteOrNull());
 
         ImGui.pushFont(host.bodyFont(), EditorChromeHost.BODY_SIZE);
         try {
@@ -89,6 +99,8 @@ public final class EditorChromeShell implements AutoCloseable {
             drawDockspace(x, y + TOOLBAR_HEIGHT, width, height - TOOLBAR_HEIGHT - STATUS_HEIGHT);
             drawLibrary(frame, level);
             drawInspector(frame, level);
+            canvas = new Area(libraryRight, y + TOOLBAR_HEIGHT, Math.max(1, inspectorLeft - libraryRight),
+                    height - TOOLBAR_HEIGHT - STATUS_HEIGHT);
             drawCanvasFrame(frame);
             drawCommandPalette(frame);
         } finally {
@@ -313,12 +325,6 @@ public final class EditorChromeShell implements AutoCloseable {
             layoutBuilt = true;
         }
         ImGui.dockSpace(dockId, 0, 0, ImGuiDockNodeFlags.PassthruCentralNode);
-        var central = imgui.internal.ImGui.dockBuilderGetCentralNode(dockId);
-        if (central != null && central.getSizeX() > 0) {
-            canvas = new Area(central.getPosX(), central.getPosY(), central.getSizeX(), central.getSizeY());
-        } else {
-            canvas = new Area(x, y, width, height);
-        }
         ImGui.end();
     }
 
@@ -341,8 +347,86 @@ public final class EditorChromeShell implements AutoCloseable {
             case BLOCK -> "World  /  Block " + hex(controller.selection().selectedBlock());
             case CHUNK -> "World  /  Block " + hex(controller.selection().selectedBlock())
                     + "  /  Chunk " + hex(controller.selection().selectedChunk());
-        } + "      " + frame.gameScale() + "x scale";
+        } + "      " + controller.canvasView().zoom() + "x zoom · Scroll to zoom · Middle-drag to pan";
         draw.addText(gx, gy + gh + 6, EditorChromeTheme.TEXT_DIM, caption);
+        drawPlacementScene(frame, draw);
+        drawRegionGhost(frame, draw);
+    }
+
+    private void drawPlacementScene(Frame frame, ImDrawList draw) {
+        var editor = com.openggf.game.session.SessionManager.getCurrentEditorMode();
+        if (editor == null) return;
+        draw.pushClipRect(frame.gameX(), frame.gameY(), frame.gameX() + frame.gameWidth(), frame.gameY() + frame.gameHeight());
+        try {
+            float unit = frame.gameWidth() / (float) editor.getCamera().getWidth() * frame.controller().canvasView().zoom();
+            com.openggf.editor.render.EditorPlacementScene.draw(frame.controller(), objectArt,
+                    new com.openggf.editor.render.EditorPlacementScene.Painter() {
+                public void image(com.openggf.editor.render.EditorObjectPreviewCache.Sprite sprite,
+                                  float x, float y, float w, float h, float alpha) {
+                    draw.addImage(sprite.texture(), x, y, x + w, y + h, 0, 0, 1, 1, EditorChromeTheme.rgba(0xffffff, alpha));
+                }
+                public void rectangle(float x, float y, float w, float h, int color, float alpha, boolean fill) {
+                    if (fill) draw.addRectFilled(x, y, x + w, y + h, EditorChromeTheme.rgba(color, alpha), 3);
+                    else draw.addRect(x, y, x + w, y + h, EditorChromeTheme.rgba(color, alpha), 3, 0, 1.5f);
+                }
+                public void chip(String label, float x, float y, int color, float alpha) {
+                    String text = label.length() > 24 ? label.substring(0, 21) + "…" : label;
+                    float w = Math.min(frame.gameWidth() - 8, ImGui.calcTextSizeX(text) + 28);
+                    x = Math.clamp(x, frame.gameX() + 3, frame.gameX() + frame.gameWidth() - w - 3);
+                    y = Math.clamp(y, frame.gameY() + 3, frame.gameY() + frame.gameHeight() - 25);
+                    draw.addRectFilled(x, y, x + w, y + 22, EditorChromeTheme.rgba(0x101927, .92f * alpha), 4);
+                    draw.addRect(x, y, x + w, y + 22, EditorChromeTheme.rgba(color, .7f * alpha), 4);
+                    draw.addCircleFilled(x + 9, y + 11, 3, EditorChromeTheme.rgba(color, alpha));
+                    draw.addText(x + 18, y + 4, EditorChromeTheme.rgba(0xe3ebf5, alpha), text);
+                }
+            }, frame.gameX(), frame.gameY(), frame.gameWidth(), frame.gameHeight(), unit,
+                    editor.getCamera().getXCopy(), editor.getCamera().getYCopy());
+        } finally { draw.popClipRect(); }
+    }
+
+    private void drawRegionGhost(Frame frame, ImDrawList draw) {
+        var controller = frame.controller(); var level = controller.currentLevel();
+        var editor = com.openggf.game.session.SessionManager.getCurrentEditorMode();
+        if (level == null || controller.depth() != EditorHierarchyDepth.WORLD || editor == null) return;
+        int size = level.getBlockPixelSize();
+        float unit = frame.gameWidth() / (float) editor.getCamera().getWidth() * controller.canvasView().zoom();
+        int cameraX = Short.toUnsignedInt(editor.getCamera().getXCopy()), cameraY = editor.getCamera().getYCopy();
+        var rect = controller.regionSelection();
+        draw.pushClipRect(frame.gameX(), frame.gameY(), frame.gameX() + frame.gameWidth(), frame.gameY() + frame.gameHeight());
+        try {
+            if (rect != null) {
+                float x = frame.gameX() + (rect.x() * size - cameraX) * unit, y = frame.gameY() + (rect.y() * size - cameraY) * unit;
+                draw.addRect(x, y, x + rect.width() * size * unit, y + rect.height() * size * unit, EditorChromeTheme.SELECTION);
+            }
+            if (!controller.isPastePreviewActive()) return;
+            try {
+                var ghost = controller.pastePreview(); rect = ghost.rectangle();
+                ghostAtlas.refresh(controller.clipboardLibrary(), 0);
+                float cell = size * unit;
+                for (int y = 0; y < rect.height(); y++) for (int x = 0; x < rect.width(); x++) {
+                    float px = frame.gameX() + ((rect.x() + x) * size - cameraX) * unit;
+                    float py = frame.gameY() + ((rect.y() + y) * size - cameraY) * unit;
+                    if (px > frame.gameX() + frame.gameWidth() || py > frame.gameY() + frame.gameHeight() || px + cell < frame.gameX() || py + cell < frame.gameY()) continue;
+                    var tile = ghostAtlas.cell(EditorTileAtlas.Kind.BLOCK, ghost.blocks().get(y * rect.width() + x));
+                    if (tile != null) draw.addImage(tile.texture(), px, py, px + cell, py + cell,
+                            tile.u0(), tile.v0(), tile.u1(), tile.v1(), 0x99FFFFFF);
+                    draw.addRect(px, py, px + cell, py + cell, EditorChromeTheme.SELECTION);
+                }
+                for (var object : ghost.objects()) {
+                    var sprite = objectArt.sprite(object);
+                    if (sprite != null) {
+                        float x = frame.gameX() + (object.x() - cameraX - sprite.originX()) * unit;
+                        float y = frame.gameY() + (object.y() - cameraY - sprite.originY()) * unit;
+                        draw.addImage(sprite.texture(), x, y, x + sprite.width() * unit, y + sprite.height() * unit,
+                                0, 0, 1, 1, EditorChromeTheme.rgba(0xffffff, .5f));
+                    }
+                }
+                for (var ring : ghost.rings()) {
+                    float x = frame.gameX() + (ring.x() - cameraX) * unit, y = frame.gameY() + (ring.y() - cameraY) * unit;
+                    draw.addCircle(x, y, 4, EditorChromeTheme.SELECTION);
+                }
+            } catch (IllegalArgumentException invalid) { draw.addText(frame.gameX() + 8, frame.gameY() + 8, EditorChromeTheme.SELECTION, "Invalid paste destination"); }
+        } finally { draw.popClipRect(); }
     }
 
     // ---------------------------------------------------------------- library
@@ -351,6 +435,7 @@ public final class EditorChromeShell implements AutoCloseable {
         LevelEditorController controller = frame.controller();
         ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 12, 12);
         if (ImGui.begin(LIBRARY)) {
+            libraryRight = ImGui.getWindowPosX() + ImGui.getWindowWidth();
             if (level == null) {
                 ImGui.textDisabled("No level loaded");
             } else if (controller.spawnEditMode() == EditorSpawnEditMode.OBJECTS && controller.objectPaletteOrNull() != null) {
@@ -503,23 +588,56 @@ public final class EditorChromeShell implements AutoCloseable {
         ImGui.pushFont(host.titleFont(), EditorChromeHost.TITLE_SIZE);
         ImGui.text("Objects");
         ImGui.popFont();
+        ImGui.textDisabled("ROM art · current level palette");
         ImGui.setNextItemWidth(-1);
-        ImGui.inputTextWithHint("##objectFilter", EditorIcons.SEARCH + "  Filter objects", filter);
+        ImGui.inputTextWithHint("##objectFilter", EditorIcons.SEARCH + "  Find an object…", filter);
+        if (ImGui.checkbox("All / internal IDs", showInternalObjects)) showInternalObjects = !showInternalObjects;
+        if (ImGui.isItemHovered()) ImGui.setTooltip("Include unsupported, system and other-zone objects. Current-level art is shown when available.");
         String query = filter.get().trim().toLowerCase(Locale.ROOT);
+        ImGui.spacing();
         ImGui.beginChild("##objects", 0, 0, false);
+        boolean revealSelection = !palette.selectedLabel().equals(revealedObjectSelection);
+        int shown = 0;
         for (var entry : palette.entries()) {
+            boolean available = objectArt.available(entry);
+            if (!showInternalObjects && (!controller.isPlaceableObject(entry) || entry.objectKey() == null && !available)) continue;
             if (!query.isEmpty() && !entry.label().toLowerCase(Locale.ROOT).contains(query)) continue;
-            boolean selected = entry.objectKey() != null
-                    ? entry.objectKey().equals(palette.selectedObjectKey())
-                    : !palette.selectedIsKeyed() && entry.stockObjectId() != null && entry.stockObjectId() == palette.selectedObjectId();
-            String id = entry.stockObjectId() != null ? String.format("$%02X", entry.stockObjectId()) : "mod";
-            if (ImGui.selectable(EditorIcons.SHAPES + "  " + entry.label() + "##" + id + entry.label(), selected)) {
-                if (entry.objectKey() != null) palette.setObjectKey(entry.objectKey());
-                else palette.setObjectId(entry.stockObjectId());
+            boolean selected = entry.objectKey() != null ? entry.objectKey().equals(palette.selectedObjectKey())
+                    : !palette.selectedIsKeyed() && entry.stockObjectId() == palette.selectedObjectId();
+            String id = entry.stockObjectId() != null ? String.format("$%02X", entry.stockObjectId()) : "Gizmo";
+            float x = ImGui.getCursorScreenPosX(), y = ImGui.getCursorScreenPosY(), width = ImGui.getContentRegionAvailX();
+            if (ImGui.invisibleButton("##object" + entry.label(), width, 66)) {
+                if (entry.objectKey() != null) palette.setObjectKey(entry.objectKey()); else palette.setObjectId(entry.stockObjectId());
             }
-            ImGui.sameLine(ImGui.getContentRegionMaxX() - ImGui.calcTextSizeX(id));
-            ImGui.textDisabled(id);
+            shown++;
+            boolean visible = ImGui.isItemVisible();
+            if (selected && revealSelection && !visible) ImGui.setScrollHereY(.5f);
+            if (!visible) continue;
+            boolean hover = ImGui.isItemHovered();
+            var draw = ImGui.getWindowDrawList();
+            draw.addRectFilled(x, y, x + width, y + 64,
+                    selected ? EditorChromeTheme.rgba(0x263d5c, 1) : EditorChromeTheme.CELL_BG, 5);
+            if (selected || hover) draw.addRect(x, y, x + width, y + 64,
+                    selected ? EditorChromeTheme.SELECTION : EditorChromeTheme.ACCENT, 5);
+            var sprite = objectArt.sprite(palette.previewSpawn(entry, selected ? palette.selectedSubtype() : 0,
+                    selected ? palette.renderFlags() : 0));
+            if (sprite != null) {
+                float scale = Math.min(2, 46f / Math.max(sprite.width(), sprite.height()));
+                float w = sprite.width() * scale, h = sprite.height() * scale;
+                draw.addImage(sprite.texture(), x + 32 - w / 2, y + 32 - h / 2, x + 32 + w / 2, y + 32 + h / 2);
+            } else {
+                draw.addCircle(x + 32, y + 31, 16, EditorChromeTheme.ACCENT, 6, 1.5f);
+                draw.addText(x + 26, y + 24, EditorChromeTheme.ACCENT,
+                        entry.objectKey() == null ? EditorIcons.BOX : EditorIcons.MAP);
+            }
+            String name = EditorStockObjectPalette.displayName(entry.label());
+            draw.addText(x + 66, y + 15, EditorChromeTheme.rgba(0xe5eaf4, 1), name);
+            draw.addText(x + 66, y + 36, EditorChromeTheme.TEXT_DIM, id + (sprite == null ? " · logic / marker" : " · ROM sprite"));
+            if (hover) ImGui.setTooltip(name + "\n" + (entry.objectKey() == null ? id : entry.objectKey())
+                    + "\nClick to use brush · right-click a placement to inspect");
         }
+        if (shown == 0) ImGui.textWrapped("No matching objects. Clear the search or enable All / internal IDs.");
+        revealedObjectSelection = palette.selectedLabel();
         ImGui.endChild();
     }
 
@@ -528,7 +646,9 @@ public final class EditorChromeShell implements AutoCloseable {
     private void drawInspector(Frame frame, MutableLevel level) {
         LevelEditorController controller = frame.controller();
         ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 14, 12);
-        if (ImGui.begin(INSPECTOR) && level != null) {
+        boolean inspectorVisible = ImGui.begin(INSPECTOR);
+        inspectorLeft = ImGui.getWindowPosX();
+        if (inspectorVisible && level != null) {
             if (controller.spawnEditMode() == EditorSpawnEditMode.OBJECTS) {
                 objectInspector(frame);
             } else if (controller.spawnEditMode() == EditorSpawnEditMode.RINGS) {
@@ -541,6 +661,8 @@ public final class EditorChromeShell implements AutoCloseable {
                     case CHUNK -> chunkInspector(frame, level);
                 }
             }
+            levelSettings(frame);
+            paletteInspector(frame, level);
         }
         ImGui.end();
         ImGui.popStyleVar();
@@ -569,7 +691,102 @@ public final class EditorChromeShell implements AutoCloseable {
         ImGui.dummy(size, size);
     }
 
+    private void levelSettings(Frame frame) {
+        var workspace = frame.controller().projects();
+        if (workspace == null || workspace.document() == null) return;
+        if (!ImGui.collapsingHeader("Level settings", imgui.flag.ImGuiTreeNodeFlags.DefaultOpen)) return;
+        var document = workspace.document();
+        var settings = document.metadata().settings();
+        String label = workspace.settingsRows().getFirst().value();
+        ImGui.textDisabled("Background / parallax");
+        ImGui.setNextItemWidth(-1);
+        if (ImGui.beginCombo("##background", label)) {
+            if (ImGui.selectable("Flat", settings.background() == null))
+                edits.accept(() -> workspace.applySettings(document, settings.withBackground(null)));
+            for (var option : workspace.backgroundOptions()) if (ImGui.selectable(option.label(), option.source().equals(settings.background())))
+                edits.accept(() -> workspace.applySettings(document, settings.withBackground(option.source())));
+            ImGui.endCombo();
+        }
+        if (workspace.supportsWater()) {
+            boolean enabled = settings.waterHeight() != null;
+            if (ImGui.checkbox("Water enabled", enabled))
+                edits.accept(() -> workspace.applySettings(document, settings.withWaterHeight(enabled ? null
+                        : Math.clamp(document.metadata().startY() + 128, (int) Short.MIN_VALUE, (int) Short.MAX_VALUE))));
+            if (enabled) {
+                ImInt height = new ImInt(settings.waterHeight());
+                ImGui.textDisabled("Water height (px)");
+                ImGui.setNextItemWidth(-1);
+                if (ImGui.inputInt("##waterHeight", height, 1, 16)) {
+                    int value = height.get();
+                    edits.accept(() -> workspace.applySettings(document, settings.withWaterHeight(value)));
+                }
+            }
+        }
+        ImGui.textDisabled("Allowed team");
+        ImGui.setNextItemWidth(-1);
+        if (ImGui.beginCombo("##allowedTeam", com.openggf.editor.project.EditorLevelTeams.label(settings.team()))) {
+            for (var option : workspace.teamChoices())
+                if (ImGui.selectable(option.label(), java.util.Objects.equals(option.team(), settings.team())))
+                    edits.accept(() -> workspace.applySettings(document, settings.withTeam(option.team())));
+            ImGui.endCombo();
+        }
+        if (ImGui.button("Title, start and bounds...")) edits.accept(workspace::properties);
+        if (ImGui.button("Campaign levels...")) edits.accept(workspace::campaign);
+        if (ImGui.button("Import art...")) edits.accept(workspace::importArtForm);
+        ImGui.textDisabled("Playtest applies the selected environment.");
+    }
+
+    private void paletteInspector(Frame frame, MutableLevel level) {
+        if (!ImGui.collapsingHeader("Level palette / Genesis 9-bit")) return;
+        for (int line = 0; line < 4; line++) {
+            for (int color = 0; color < 16; color++) {
+                ImGui.pushID(line * 16 + color);
+                if (color > 0) ImGui.sameLine(0, 2);
+                var rgb = level.getPalette(line).getColor(color);
+                if (ImGui.colorButton("##color", rgb.rFloat(), rgb.gFloat(), rgb.bFloat(), 1, 0, 15, 18)) {
+                    paletteEditLine = line; paletteEditColor = color;
+                }
+                if (ImGui.isItemHovered()) ImGui.setTooltip("Line " + line + " / color " + color);
+                ImGui.popID();
+            }
+        }
+        var controller = frame.controller();
+        ImGui.text("Line " + paletteEditLine + " / color " + paletteEditColor);
+        if (!controller.isPaletteCellEditable(paletteEditLine, paletteEditColor)) {
+            ImGui.textDisabled("Host-owned palette cell"); return;
+        }
+        var rgb = level.getPalette(paletteEditLine).getColor(paletteEditColor);
+        int[] steps = {(Byte.toUnsignedInt(rgb.r) * 7 + 127) / 255, (Byte.toUnsignedInt(rgb.g) * 7 + 127) / 255,
+                (Byte.toUnsignedInt(rgb.b) * 7 + 127) / 255};
+        String[] names = {"Red", "Green", "Blue"};
+        for (int channel = 0; channel < 3; channel++) {
+            if (ImGui.beginCombo(names[channel], Integer.toString(com.openggf.editor.palette.EditorPaletteEditing.componentFromStep(steps[channel])))) {
+                try {
+                    for (int value = 0; value < 8; value++) {
+                        if (ImGui.selectable(Integer.toString(com.openggf.editor.palette.EditorPaletteEditing.componentFromStep(value)), steps[channel] == value)) {
+                            int[] edited = steps.clone(); edited[channel] = value;
+                            int line = paletteEditLine, color = paletteEditColor;
+                            edits.accept(() -> controller.editPaletteColor(line, color, edited[0], edited[1], edited[2]));
+                        }
+                    }
+                } finally { ImGui.endCombo(); }
+            }
+        }
+        ImGui.textDisabled("8 exact values per channel; each edit is undoable.");
+    }
+
     private void worldInspector(Frame frame, MutableLevel level) {
+        heading("Region / clipboard");
+        if (ImGui.button("Set corner / finish (F6)")) frame.dispatch().accept(Action.SELECT_REGION_CORNER);
+        ImGui.sameLine(); if (ImGui.button("Clear")) frame.dispatch().accept(Action.CLEAR_REGION);
+        if (ImGui.button("Copy")) frame.dispatch().accept(Action.COPY_REGION);
+        ImGui.sameLine(); if (ImGui.button("Cut")) frame.dispatch().accept(Action.CUT_REGION);
+        ImGui.sameLine(); if (ImGui.button("Paste preview")) frame.dispatch().accept(Action.PASTE_REGION);
+        if (ImGui.button("Delete region")) frame.dispatch().accept(Action.DELETE_REGION);
+        ImGui.sameLine(); if (ImGui.button("Fill rectangle")) frame.dispatch().accept(Action.FILL_REGION);
+        if (ImGui.button("Flood fill at cursor")) frame.dispatch().accept(Action.FLOOD_FILL);
+        ImGui.textDisabled("Shift+drag selects cells. Enter places; Esc cancels paste.");
+
         LevelEditorController controller = frame.controller();
         heading("Block brush");
         preview(EditorTileAtlas.Kind.BLOCK, controller.selectedBlockIndex(), 112);
@@ -790,12 +1007,37 @@ public final class EditorChromeShell implements AutoCloseable {
                 row("Position", spawn.x() + ", " + spawn.y());
                 ImGui.endTable();
             }
-            ImGui.alignTextToFramePadding();
-            ImGui.text(String.format("Subtype  $%02X", spawn.subtype()));
-            ImGui.sameLine();
-            if (ImGui.button(EditorIcons.MINUS + "##sub")) frame.dispatch().accept(Action.DECREMENT_SELECTED_SUBTYPE);
-            ImGui.sameLine(0, 4);
-            if (ImGui.button(EditorIcons.PLUS + "##sub")) frame.dispatch().accept(Action.INCREMENT_SELECTED_SUBTYPE);
+            if (!controller.selectedGizmoFields().isEmpty()) gizmoInspector(controller, spawn);
+            else for (var field : controller.selectedObjectProperties().editableFields()) {
+                int current = field.decode(spawn.subtype());
+                ImGui.pushID(field.id());
+                try {
+                    if (field.kind() == com.openggf.level.metadata.ObjectPropertySchema.Kind.BOOLEAN) {
+                        if (ImGui.checkbox(field.label(), current != 0)) edits.accept(() -> controller.setSelectedObjectProperty(field.id(), current == 0 ? 1 : 0));
+                    } else if (field.kind() == com.openggf.level.metadata.ObjectPropertySchema.Kind.ENUM) {
+                        ImGui.textDisabled(field.label());
+                        ImGui.setNextItemWidth(-1);
+                        if (ImGui.beginCombo("##value", field.display(spawn.subtype()))) {
+                            try {
+                                for (var choice : field.choices().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey()).toList()) {
+                                    if (ImGui.selectable(choice.getValue(), current == choice.getKey())) {
+                                        int value = choice.getKey();
+                                        edits.accept(() -> controller.setSelectedObjectProperty(field.id(), value));
+                                    }
+                                }
+                            } finally { ImGui.endCombo(); }
+                        }
+                    } else {
+                        var value = new imgui.type.ImInt(current);
+                        ImGui.textDisabled(field.label());
+                        ImGui.setNextItemWidth(-1);
+                        if (ImGui.inputInt("##value", value) && value.get() >= 0 && value.get() <= field.maximum()) {
+                            int next = value.get();
+                            edits.accept(() -> controller.setSelectedObjectProperty(field.id(), next));
+                        }
+                    }
+                } finally { ImGui.popID(); }
+            }
             if (ImGui.checkbox("Flip horizontal", (spawn.renderFlags() & 1) != 0)) controller.toggleSelectedSpawnFlag(1);
             if (ImGui.checkbox("Flip vertical", (spawn.renderFlags() & 2) != 0)) controller.toggleSelectedSpawnFlag(2);
             if (ImGui.checkbox("Respawn tracked  (R)", spawn.respawnTracked())) frame.dispatch().accept(Action.TOGGLE_SELECTED_RESPAWN);
@@ -803,6 +1045,44 @@ public final class EditorChromeShell implements AutoCloseable {
             if (ImGui.button(EditorIcons.ERASER + "  Delete placement", -1, 0)) frame.dispatch().accept(Action.DELETE_SPAWN);
         }
         helpFooter("Click places the brush. Right-click selects an existing placement.");
+    }
+
+    private void gizmoInspector(LevelEditorController controller, ObjectSpawn spawn) {
+        for (var field : controller.selectedGizmoFields()) {
+            Object current = field.value(spawn.authoredProperties());
+            ImGui.pushID(field.key());
+            try {
+                switch (field.kind()) {
+                    case BOOL -> { if (ImGui.checkbox(field.label(), (Boolean)current))
+                        edits.accept(() -> controller.setSelectedGizmoProperty(field.key(), !(Boolean)current)); }
+                    case INT -> {
+                        var value = new imgui.type.ImInt((Integer)current);
+                        ImGui.textDisabled(field.label());
+                        ImGui.setNextItemWidth(-1);
+                        if (ImGui.inputInt("##value", value) && value.get() >= field.min() && value.get() <= field.max()) {
+                            int next = value.get(); edits.accept(() -> controller.setSelectedGizmoProperty(field.key(), next));
+                        }
+                    }
+                    case ENUM -> {
+                        ImGui.textDisabled(field.label());
+                        ImGui.setNextItemWidth(-1);
+                        if (ImGui.beginCombo("##value", (String)current)) {
+                            try { for (String choice : field.choices()) if (ImGui.selectable(choice, choice.equals(current)))
+                                edits.accept(() -> controller.setSelectedGizmoProperty(field.key(), choice)); }
+                            finally { ImGui.endCombo(); }
+                        }
+                    }
+                    case TEXT -> {
+                        ImGui.textDisabled(field.label()); ImGui.textWrapped((String)current);
+                        if (ImGui.button("Edit...")) edits.accept(() -> controller.openGizmoTextField(field));
+                    }
+                }
+            } finally { ImGui.popID(); }
+        }
+        if (spawn.authoredProperties() instanceof com.openggf.level.objects.authored.AuthoredObjectProperties.Warp)
+            ImGui.textWrapped("Place another Warp to create the exit. The lower placement ID is the one-way source.");
+        if (spawn.authoredProperties() instanceof com.openggf.level.objects.authored.AuthoredObjectProperties.StageplayTrigger)
+            ImGui.textWrapped("Stageplay uses the public blocking player. Up activates button triggers.");
     }
 
     private static void row(String label, String value) {
@@ -931,5 +1211,7 @@ public final class EditorChromeShell implements AutoCloseable {
     @Override
     public void close() {
         atlas.close();
+        ghostAtlas.close();
+        objectArt.close();
     }
 }

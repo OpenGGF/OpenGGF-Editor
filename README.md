@@ -19,14 +19,20 @@ in OpenGGF.
 
 ## What it has today
 
-- **Library:** ROM-decoded thumbnails of every block, chunk and pattern, with a hex filter
-  and a size slider.
+- **Library:** ROM-decoded thumbnails of blocks, chunks, patterns and objects. The object
+  list pairs real mapping frames with readable names and hides internal IDs by default;
+  **All / internal IDs** reveals the complete list. Terrain has a hex filter and size slider.
+- **Canvas:** sprite placements and translucent brush previews use the level palette,
+  native origins and flips. Compact region chips stay legible when zoomed. The picture
+  fits between docked panels, including small windows and narrow docks.
 - **Inspector:**
   - World: the brush and the cell under the cursor.
   - Block: an 8x8 composition grid (click to paint, right-click to pick), flips, solidity
     and height-map index.
   - Chunk: a 2x2 grid, palette lines and priority.
-  - Objects: stock object placement.
+  - Objects: stock object placement and selected-placement typed properties (spring
+    orientation/strength, monitor contents, Sonic 2 platform movement/shape/solidity).
+    Unsupported objects keep raw-byte editing. Each edit undoes independently.
 - **Toolbar:** mode, FG/BG layer, collision overlay and path, undo and redo, save,
   playtest from the cursor, and a clickable breadcrumb.
 - **Command palette:** every editor command, plus OpenGGF's project commands (new, open,
@@ -35,6 +41,33 @@ in OpenGGF.
   scrubber and a chronological key/cue list. Direct movement, fixed sprite poses,
   animations, cameras, captions, sound, music and voice through the same authoring
   commands used by the in-engine editor.
+
+## Level authoring controls
+
+Pick an object with right click, then edit its named fields in **Selected placement**.
+The inspector keeps **Raw subtype** for every object; each change is one undo step.
+
+**Shift+left drag** selects world cells. **F6** sets the first and opposite corners
+with the keyboard. The World inspector offers copy, cut, paste preview, delete,
+rectangle fill and flood fill; **Ctrl+C/X/V** are the clipboard shortcuts. Move the
+translucent terrain/spawn preview and **Enter** or click to paste; **Escape** cancels.
+The active layer's terrain is copied with objects/rings, preserving whole native
+ring groups. Paste rejects invalid/outside destinations before changing the level.
+
+Middle-drag pans, the mouse wheel zooms around the pointer, **Ctrl+arrows** pans,
+**Ctrl+=/-** zooms and **Ctrl+0** returns to native 1×. Navigation is independent
+of undo history and gameplay camera bounds. Zoom magnifies 1×–8×.
+
+Open **Level palette / Genesis 9-bit** in the inspector, choose a color and set RGB
+from the eight exact native values. Character/HUD-owned cells are locked. Color
+edits update preview textures and round-trip through the existing project/export
+formats. **Level settings** offers provider-backed background scrolling, fixed water
+height and an allowed team; playtest applies them. Built-in `openggf:` camera/music
+zones, paired warps and blocking Stageplay triggers have typed inspector fields.
+**Campaign levels** orders saved projects and exports a playable mod JAR without
+Java. **Import art** opens project-contained PNG/sheet paths with a file browser;
+installation and optional palette changes form one undo step. Shared forms also
+work with the HUD controller keyboard.
 
 ## Stageplay
 
@@ -230,6 +263,20 @@ or start from a directory where OpenGGF is already configured. At the title scre
 replaces the engine's built-in controller HUD. To use that HUD, run OpenGGF without
 the desktop editor on its class path.
 
+## Offscreen visual checks
+
+`TestEditorPolishS1Pictures`, `TestEditorPolishS2Pictures` and
+`TestEditorPolishS3KPictures` enter the production editor with GHZ1, EHZ1 and AIZ1,
+then capture both desktop and HUD libraries, placed sprites, ghosts, gizmos and
+Rings mode. They compare placed-monitor pixels against the ROM art separately
+from the picker. Use the engine's queued Maven wrapper with `DISPLAY` and
+`WAYLAND_DISPLAY` unset, `-Dopenggf.editor.polishPictures=true`,
+`-Dopenggf.headless.gl=surfaceless-egl`, `-DforkCount=1`, `-DreuseForks=false` and
+absolute `sonic1.rom.path`, `sonic2.rom.path`, `s3k.rom.path` properties. A fresh
+JVM per ROM prevents palette-publication state from contaminating the pictures.
+Outputs are under `target/editor-polish/`; archive reviewed evidence outside the
+repositories. Without the opt-in these picture tests skip.
+
 ## Known limits
 
 - **An internal ImGui error closes the program.** imgui-java ends the process after any
@@ -240,8 +287,8 @@ the desktop editor on its class path.
   with offscreen rendering and simulated input.
 - **No saved dock layout.** `imgui.ini` is disabled, so panels return to their default
   layout on every start.
-- **The level-editing canvas is the engine's fixed camera view.** It is drawn at an
-  integer scale. Stageplay camera keys provide authored pan and zoom for scenes.
+- **Canvas zoom starts at native 1×.** Middle-drag pans independently; wheel zoom
+  magnifies the world 1×–8×. Zooming out to show a wider world remains unavailable.
 - **No native image.** The editor runs on the JVM. The engine's GraalVM build has not been
   adapted to include it.
 
