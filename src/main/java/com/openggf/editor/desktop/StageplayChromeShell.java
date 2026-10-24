@@ -248,6 +248,7 @@ final class StageplayChromeShell implements com.openggf.stageplay.editor.Stagepl
             if (ImGui.button("Scene changes / transitions", -1, 0)) frame.invoke(Action.SCENE_CHANGES);
             if (ImGui.button("Film format presets", -1, 0)) frame.invoke(Action.FILM_FORMAT);
             if (ImGui.button("Dialogue / speakers", -1, 0)) frame.invoke(Action.DIALOGUE);
+            if (ImGui.button("Speaker voice", -1, 0)) frame.invoke(Action.SPEAKER_VOICE);
             if (ImGui.button("Caption", -1, 0)) frame.invoke(Action.CAPTION);
             if (ImGui.button("Sound, music or voice", -1, 0)) frame.invoke(Action.AUDIO);
         }

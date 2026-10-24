@@ -39,6 +39,27 @@ import static org.lwjgl.opengl.GL11.*;
  */
 class TestStageplayChromePictures {
     @Test
+    void captureCompactObjectVoiceForm() throws Exception {
+        assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
+        assertEquals("surfaceless-egl",System.getProperty("openggf.headless.gl"));
+        Path rom=Path.of(System.getProperty("sonic2.rom.path"));
+        try(var boot=new HeadlessGameBoot(1280,720,320,224,320,224)) {
+            boot.setBootToTitle(true);boot.boot(rom,0,0);
+            try(var renderer=new EditorProjectMenuRenderer()) {
+                var key=new StageplayDocument.ObjectKey(0,100,200,0,-1,false,true,StageplayDocument.Interpolation.HOLD,StageplayDocument.ObjectMode.POSE);
+                var scene=StageplayDocument.empty("s2",0,0,0,500,320,224).withObjectActors(List.of(
+                        new StageplayDocument.ObjectActor("moto","Motobug","s1",0,0,64,0,-1,List.of(key),List.of())));
+                var workspace=new StageplayWorkspace(()->scene);workspace.activate();workspace.selectActor("moto");
+                var queue=new java.util.ArrayDeque<Runnable>();var frame=new StageplayChromeShell.Frame(workspace,queue::addLast,0,0,320,224,1);
+                frame.invoke(StageplayWorkspace.Action.SPEAKER_VOICE);queue.removeFirst().run();
+                assertEquals(6,workspace.menu().values().size());
+                renderMenu(renderer,workspace,1280,720);capture("speaker-voice-form",1280,720);
+                assertEquals(GL_NO_ERROR,glGetError());
+            }
+        }
+    }
+
+    @Test
     void captureCollisionRouteAndVisualFootprintForms() throws Exception {
         assumeTrue(Boolean.getBoolean("openggf.stageplay.desktopPictures"), "Explicit desktop picture refresh only");
         assertEquals("surfaceless-egl",System.getProperty("openggf.headless.gl"));
